@@ -2761,7 +2761,7 @@ function App() {
         <div className="hero-overlay" />
         <div className="hero-content">
           <p className="eyebrow">HA furniture Marketplace</p>
-          <h1>HA furniture</h1>
+          <h1>Home Style</h1>
           <p>
             Browse real products, ask support about any piece, and create orders
             without leaving the storefront.
