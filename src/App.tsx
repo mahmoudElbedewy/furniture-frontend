@@ -3624,13 +3624,9 @@ function App() {
               </div>
             )}
 
-            <button
-  type="submit"
-  className="panel-primary"
-  disabled={totalDeposit > 0 && !depositProofFile && !depositSentViaWhatsapp}
->
-  Create Order
-</button>
+            <button type="submit" className="panel-primary">
+              Create Order
+            </button>
           </form>
         </aside>
       )}
