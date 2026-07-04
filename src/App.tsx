@@ -756,7 +756,7 @@ function App() {
       id: "welcome",
       sender: "agent",
       content:
-        "أهلاً بيك.\nأنا كريم من HA Furniture.\nقولي محتاج إيه — منتج، شحن، أو أوردر.",
+        "أهلاً بيك.\nأنا كريم من Home Style.\nقولي محتاج إيه — منتج، شحن، أو أوردر.",
     },
   ]);
   const [draft, setDraft] = useState("");
@@ -1482,7 +1482,7 @@ function App() {
       {
         id: "welcome",
         sender: "agent",
-        content: "أهلاً بيك.\nأنا كريم من HA Furniture.\nقولي محتاج إيه — منتج، شحن، أو أوردر.",
+        content: "أهلاً بيك.\nأنا كريم من Home Style.\nقولي محتاج إيه — منتج، شحن، أو أوردر.",
       },
     ]);
     try {
@@ -2699,7 +2699,7 @@ function App() {
         <div className="modal-panel about-modal">
           <div className="about-content">
             <header>
-              <h2>عن HA Furniture</h2>
+              <h2>عن Home Style</h2>
               <button
                 type="button"
                 onClick={() => setAboutModalOpen(false)}
@@ -2712,7 +2712,7 @@ function App() {
               <section className="about-section">
                 <h3>افرش بيتك كله من مكان واحد</h3>
                 <p>
-                  في HA Furniture، بنقدملك أكبر تشكيلة متميزة في عالم الأثاث والديكور المنزلي، من قطعة واحدة لغرفة كاملة.
+                  في Home Style، بنقدملك أكبر تشكيلة متميزة في عالم الأثاث والديكور المنزلي، من قطعة واحدة لغرفة كاملة.
                   وحدات شاشة | نيش | بوفيه | جزامات | تسريحة مضيئة | ترابيزات أنتريه | بانكيت
                   كل اللي بيتك محتاجه، هتلاقيه عندنا بجودة عالية وسعر مناسب.
                 </p>
@@ -2720,7 +2720,7 @@ function App() {
               <section className="about-section">
                 <h3>إحنا مين؟</h3>
                 <p>
-                  HA Furniture مش مجرد متجر أثاث، إحنا بنجمعلك أفضل الورش والمصانع من مختلف أنحاء مصر في مكان واحد، وبنوصلهملك بكل سهولة من غير ما تتعب في الدور والمقارنة بين عشرات الأماكن. بندوّر عنك على أجود المنتجات من مصادر موثوقة، وبنراجعها قبل ما توصلك، عشان تضمن إنك بتاخد أفضل قطعة بأنسب سعر من غير أي مجهود منك.
+                  Home Style مش مجرد متجر أثاث، إحنا بنجمعلك أفضل الورش والمصانع من مختلف أنحاء مصر في مكان واحد، وبنوصلهملك بكل سهولة من غير ما تتعب في الدور والمقارنة بين عشرات الأماكن. بندوّر عنك على أجود المنتجات من مصادر موثوقة، وبنراجعها قبل ما توصلك، عشان تضمن إنك بتاخد أفضل قطعة بأنسب سعر من غير أي مجهود منك.
                 </p>
               </section>
               <section className="about-section">
@@ -2748,7 +2748,7 @@ function App() {
                   ثقتك هي أساس شغلنا، ولذلك بنشجعك تطّلع على آراء وتقييمات عملائنا وآخر عمليات التسليم الفعلية على أرض الواقع قبل ما تقرر.
                 </p>
                 <p className="about-signature">
-                  HA Furniture — دايمًا في خدمتكم 🙏
+                  Home Style — دايمًا في خدمتكم 🙏
                 </p>
               </section>
             </div>
@@ -2760,7 +2760,7 @@ function App() {
         <img src={heroImage} alt="Modern living room" />
         <div className="hero-overlay" />
         <div className="hero-content">
-          <p className="eyebrow">HA furniture Marketplace</p>
+          <p className="eyebrow">Home Style Marketplace</p>
           <h1>Home Style</h1>
           <p>
             Browse real products, ask support about any piece, and create orders
