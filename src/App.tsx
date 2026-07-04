@@ -1830,16 +1830,14 @@ function App() {
         <main className="site-shell">
           <header className="nav-bar">
             <a className="brand" href="#catalog">
-              HA furniture
-            </a>
+              Home Style            </a>
           </header>
           <section className="auth-section">
             <div className="admin-card login-card">
               <p className="eyebrow">تسجيل الخروج</p>
               <h1>خروج</h1>
               <p className="muted">
-                إنهاء جلسة العميل على HA furniture
-              </p>
+                إنهاء جلسة العميل على Home Style              </p>
               <button
                 type="button"
                 className="panel-primary"
@@ -1859,8 +1857,7 @@ function App() {
       <main className="site-shell">
         <header className="nav-bar">
           <a className="brand" href="#catalog">
-            HA furniture
-          </a>
+            Home Style          </a>
           <nav aria-label="Auth navigation">
             <a href="#catalog">Catalog</a>
             <a href="#login">Login</a>
@@ -1932,8 +1929,7 @@ function App() {
       <main className="site-shell admin-shell">
         <header className="nav-bar">
           <a className="brand" href="#catalog">
-            HA furniture
-          </a>
+            Home Style          </a>
           <nav aria-label="Admin navigation">
             <a href="#catalog">Storefront</a>
             <a href="#admin">Admin Panel</a>
@@ -2512,8 +2508,7 @@ function App() {
     <main className="site-shell">
       <header className="nav-bar">
         <a className="brand" href="/">
-          HA furniture
-        </a>
+          Home Style        </a>
         <nav aria-label="Primary navigation">
           <a href="#catalog">Catalog</a>
           <a href="#checkout">Checkout</a>
