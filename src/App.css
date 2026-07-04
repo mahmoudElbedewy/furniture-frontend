@@ -537,7 +537,10 @@ button {
 
 .product-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  height: 100%;
 }
 
 .image-button {
@@ -616,6 +619,9 @@ button {
 }
 
 .product-copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   padding-top: 18px;
 }
 
@@ -627,7 +633,12 @@ button {
 }
 
 .product-copy h3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   margin: 8px 0 4px;
+  min-height: calc(1.1em * 2);
   color: var(--cream);
   font-family: var(--serif);
   font-size: 22px;
@@ -641,6 +652,10 @@ button {
 }
 
 .product-copy p:last-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
   font-family: var(--mono);
   font-size: 12px;
 }
@@ -649,7 +664,8 @@ button {
   display: grid;
   grid-template-columns: 1fr;
   align-items: stretch;
-  margin-top: 18px;
+  margin-top: auto;
+  padding-top: 18px;
 }
 
 .card-actions button {
@@ -3094,8 +3110,8 @@ button {
   }
 
   .toolbar {
-    grid-template-columns: 1fr;
-    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
   .toolbar input,
@@ -3105,6 +3121,12 @@ button {
 
   .toolbar button {
     min-height: 48px;
+  }
+
+  .toolbar-material,
+  .toolbar-category,
+  .toolbar-submit {
+    grid-column: 1 / -1;
   }
 
   .chat-panel {

@@ -5,6 +5,7 @@ import {
   Heart,
   ImageUp,
   Loader2,
+  Menu,
   MessageCircle,
   PackageSearch,
   Power,
@@ -730,6 +731,7 @@ function App() {
   const [maxPriceFilter, setMaxPriceFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInputOpen, setSearchInputOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -830,6 +832,11 @@ function App() {
     if (hash !== "#catalog") {
       setSearchQuery("");
     }
+  }, [hash]);
+
+  // Close the mobile nav dropdown whenever the route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
   }, [hash]);
 
   // Debounce search query - only when on catalog page and search query changes
@@ -2509,24 +2516,55 @@ function App() {
       <header className="nav-bar">
         <a className="brand" href="/">
           Home Style        </a>
-        <nav aria-label="Primary navigation">
-          <a href="#catalog">Catalog</a>
-          <a href="#checkout">Checkout</a>
-          <a href="#orders">My Orders</a>
-          <a href="#track">Track</a>
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileMenuOpen}
+        >
+          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+        <nav
+          aria-label="Primary navigation"
+          className={mobileMenuOpen ? "mobile-open" : ""}
+        >
+          <a href="#catalog" onClick={() => setMobileMenuOpen(false)}>
+            Catalog
+          </a>
+          <a href="#checkout" onClick={() => setMobileMenuOpen(false)}>
+            Checkout
+          </a>
+          <a href="#orders" onClick={() => setMobileMenuOpen(false)}>
+            My Orders
+          </a>
+          <a href="#track" onClick={() => setMobileMenuOpen(false)}>
+            Track
+          </a>
           <button
             type="button"
-            onClick={() => setAboutModalOpen(true)}
+            onClick={() => {
+              setAboutModalOpen(true);
+              setMobileMenuOpen(false);
+            }}
             className="nav-about-btn"
           >
             About Us
           </button>
           {customerProfile ? (
-            <a href="#logout">Logout</a>
+            <a href="#logout" onClick={() => setMobileMenuOpen(false)}>
+              Logout
+            </a>
           ) : (
-            <a href="#login">Login</a>
+            <a href="#login" onClick={() => setMobileMenuOpen(false)}>
+              Login
+            </a>
           )}
-          {hasAdminToken && <a href="#admin">Admin</a>}
+          {hasAdminToken && (
+            <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
+              Admin
+            </a>
+          )}
         </nav>
         <div className="nav-actions">
           <div className="search-container">
@@ -2807,12 +2845,14 @@ function App() {
           }}
         >
           <input
+            className="toolbar-material"
             value={materialFilter}
             onChange={(event) => setMaterialFilter(event.target.value)}
             placeholder="Filter by material"
             aria-label="Filter by material"
           />
           <input
+            className="toolbar-min-price"
             type="number"
             min="0"
             value={minPriceFilter}
@@ -2821,6 +2861,7 @@ function App() {
             aria-label="Minimum price"
           />
           <input
+            className="toolbar-max-price"
             type="number"
             min="0"
             value={maxPriceFilter}
@@ -2829,6 +2870,7 @@ function App() {
             aria-label="Maximum price"
           />
           <select
+            className="toolbar-category"
             value={selectedCategory}
             onChange={(event) => setSelectedCategory(event.target.value)}
             aria-label="Filter category"
@@ -2841,6 +2883,7 @@ function App() {
             ))}
           </select>
           <select
+            className="toolbar-deposit"
             value={depositFilter}
             onChange={(event) => setDepositFilter(event.target.value)}
             aria-label="Filter deposit products"
@@ -2850,6 +2893,7 @@ function App() {
             <option value="false">No deposit</option>
           </select>
           <select
+            className="toolbar-shipping"
             value={shippingFilter}
             onChange={(event) => setShippingFilter(event.target.value)}
             aria-label="Filter shipping coverage"
@@ -2858,7 +2902,9 @@ function App() {
             <option value="all_governorates">All governorates</option>
             <option value="cairo_giza">Cairo and Giza only</option>
           </select>
-          <button type="submit">Apply</button>
+          <button type="submit" className="toolbar-submit">
+            Apply
+          </button>
         </form>
 
         {loading && (
