@@ -557,7 +557,30 @@ const api = {
   async fetchProductCards(endpoint: string) {
     return request<{ products: ChatProductCard[] }>(endpoint);
   },
-  async createOrder(payload: OrderPayload) {
+  async createOrder(payload: OrderPayload, depositProofImage?: File | null) {
+    if (depositProofImage) {
+      const form = new FormData();
+      form.append("customer_name", payload.customer_name);
+      form.append("customer_phone", payload.customer_phone);
+      form.append("customer_governorate", payload.customer_governorate);
+      form.append("customer_address", payload.customer_address);
+      form.append("notes", payload.notes ?? "");
+      form.append("shipping_price", String(payload.shipping_price ?? 0));
+      form.append("items", JSON.stringify(payload.items));
+      form.append("deposit_proof_image", depositProofImage);
+
+      const response = await fetch(`${API_BASE_URL}/api/orders/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: form,
+      });
+      if (!response.ok) {
+        const errBody = await safeJson(response).catch(() => null);
+        throw new Error(`${response.status} ${errBody?.detail ?? JSON.stringify(errBody) ?? response.statusText}`);
+      }
+      return safeJson(response) as Promise<Order>;
+    }
+
     return request<Order>("/api/orders/", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -750,6 +773,12 @@ function App() {
   const [chatError, setChatError] = useState("");
   const [chatConnected, setChatConnected] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [depositProofFile, setDepositProofFile] = useState<File | null>(null);
+  const [depositProofPreview, setDepositProofPreview] = useState<string | null>(null);
+  const [depositSentViaWhatsapp, setDepositSentViaWhatsapp] = useState(false);
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
+  const [pendingOrderPayload, setPendingOrderPayload] = useState<OrderPayload | null>(null);
+
   const [chatProductCards, setChatProductCards] = useState<
     Record<string, ChatProductCard[]>
   >({});
@@ -1214,6 +1243,41 @@ function App() {
   );
 
   const grandTotal = subtotal + totalShipping;
+  const DEPOSIT_PHONE_DISPLAY = "+20 15 0346 6584";
+  const DEPOSIT_PHONE_WA = "201503466584";
+
+  const totalDeposit = cart.reduce(
+    (total, item) =>
+      total +
+      (item.product.requires_deposit && item.product.deposit_amount
+        ? Number(item.product.deposit_amount) * item.quantity
+        : 0),
+    0,
+  );
+
+  const copyDepositPhone = async () => {
+    try {
+      await navigator.clipboard.writeText(DEPOSIT_PHONE_DISPLAY);
+      setToast({ tone: "success", text: "تم نسخ الرقم." });
+    } catch {
+      setToast({ tone: "error", text: "تعذر نسخ الرقم." });
+    }
+  };
+
+  const sendDepositViaWhatsapp = () => {
+    const message = `مرحباً، أريد إرسال إيصال تحويل الديبوزيت بقيمة ${money(totalDeposit)} لطلبي.`;
+    window.open(`https://wa.me/${DEPOSIT_PHONE_WA}?text=${encodeURIComponent(message)}`, "_blank");
+    setDepositSentViaWhatsapp(true);
+    setDepositProofFile(null);
+    setDepositProofPreview(null);
+  };
+
+  const handleDepositFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setDepositProofFile(file);
+    setDepositSentViaWhatsapp(false);
+    setDepositProofPreview(file ? URL.createObjectURL(file) : null);
+  };
 
   const openProductDetails = async (product: Product) => {
     setActiveProduct(product);
@@ -1502,18 +1566,20 @@ function App() {
     }
   };
 
-  const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
+  const submitOrder = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!cart.length) {
-      setToast({ tone: "error", text: "Cart is empty." });
+      setToast({ tone: "error", text: "السلة فارغة." });
+      return;
+    }
+
+    if (totalDeposit > 0 && !depositProofFile && !depositSentViaWhatsapp) {
+      setToast({ tone: "error", text: "برجاء رفع صورة إيصال الديبوزيت أو تأكيد إرساله عبر واتساب." });
       return;
     }
 
     const form = new FormData(event.currentTarget);
-    const totalShipping = cart.reduce(
-      (total, item) => total + (item.shippingPrice || 0),
-      0,
-    );
+    const totalShipping = cart.reduce((total, item) => total + (item.shippingPrice || 0), 0);
 
     const payload: OrderPayload = {
       customer_name: String(form.get("customer_name") ?? ""),
@@ -1530,25 +1596,33 @@ function App() {
       })),
     };
 
-    localStorage.setItem("furniture_customer_name", payload.customer_name);
-    localStorage.setItem("furniture_customer_phone", payload.customer_phone);
+    setPendingOrderPayload(payload);
+    setPolicyModalOpen(true);
+  };
+
+  const confirmPolicyAndCreateOrder = async (agreed: boolean) => {
+    setPolicyModalOpen(false);
+    if (!agreed || !pendingOrderPayload) {
+      setPendingOrderPayload(null);
+      return;
+    }
+
+    localStorage.setItem("furniture_customer_name", pendingOrderPayload.customer_name);
+    localStorage.setItem("furniture_customer_phone", pendingOrderPayload.customer_phone);
 
     try {
-      const order = await api.createOrder(payload);
+      const order = await api.createOrder(pendingOrderPayload, depositProofFile);
       setOrderResult(order);
       setCart([]);
       setCheckoutOpen(false);
-      if (hasAuthToken) {
-        loadMyOrders();
-      }
-      setToast({
-        tone: "success",
-        text: `تم إنشاء الطلب: ${order.order_number ?? order.id}`,
-      });
+      setDepositProofFile(null);
+      setDepositProofPreview(null);
+      setDepositSentViaWhatsapp(false);
+      setPendingOrderPayload(null);
+      if (hasAuthToken) loadMyOrders();
+      setToast({ tone: "success", text: `تم إنشاء الطلب: ${order.order_number ?? order.id}` });
     } catch (error) {
-      await api
-        .saveAbandonedCart(payload.customer_phone, cart)
-        .catch(() => null);
+      await api.saveAbandonedCart(pendingOrderPayload.customer_phone, cart).catch(() => null);
       setToast({
         tone: "error",
         text: `لم يتم إنشاء الطلب: ${error instanceof Error ? error.message : "حدث خطأ غير معروف"}`,
@@ -3508,11 +3582,93 @@ function App() {
                 <strong>{money(grandTotal)}</strong>
               </div>
             </div>
-            <button type="submit" className="panel-primary">
-              Create Order
-            </button>
+            {totalDeposit > 0 && (
+              <div className="deposit-proof-section">
+                <p className="deposit-note">
+                  ⚠️ هذا الطلب يتطلب ديبوزيت بقيمة <strong>{money(totalDeposit)}</strong>.
+                  حوّله على فودافون كاش على الرقم التالي وارفع صورة التحويل، أو ابعتهالنا على واتساب.
+                </p>
+                <div className="deposit-phone-row">
+                  <span className="deposit-phone">{DEPOSIT_PHONE_DISPLAY}</span>
+                  <button type="button" onClick={copyDepositPhone}>نسخ الرقم</button>
+                </div>
+
+                <label className="deposit-upload">
+                  <ImageUp size={18} />
+                  {depositProofFile ? "تغيير صورة الإيصال" : "رفع صورة إيصال التحويل"}
+                  <input type="file" accept="image/*" onChange={handleDepositFileChange} hidden />
+                </label>
+                {depositProofPreview && (
+                  <img src={depositProofPreview} alt="إيصال الديبوزيت" className="deposit-preview" />
+                )}
+
+                <div className="deposit-whatsapp-alt">
+                  <button type="button" onClick={sendDepositViaWhatsapp}>
+                    <MessageCircle size={16} /> إرسال الإيصال عبر واتساب
+                  </button>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={depositSentViaWhatsapp}
+                      onChange={(e) => {
+                        setDepositSentViaWhatsapp(e.target.checked);
+                        if (e.target.checked) {
+                          setDepositProofFile(null);
+                          setDepositProofPreview(null);
+                        }
+                      }}
+                    />
+                    تم إرسال صورة الإيصال عبر واتساب
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <button
+  type="submit"
+  className="panel-primary"
+  disabled={totalDeposit > 0 && !depositProofFile && !depositSentViaWhatsapp}
+>
+  Create Order
+</button>
           </form>
         </aside>
+      )}
+      {policyModalOpen && (
+        <div className="modal-overlay">
+          <div className="policy-modal">
+            <h3>التوصيل والاستلام</h3>
+            <p className="policy-intro">
+              بنحرص إن يوصلك طلبك بأسرع وقت ممكن، وبنوضحلك سياستنا بكل شفافية من الأول:
+            </p>
+            <ul className="policy-list">
+              <li>
+                <strong>مدة التوصيل:</strong> خلال أسبوع من تأكيد الطلب.
+              </li>
+              <li>
+                <strong>المعاينة عند الاستلام:</strong> تقدر تعاين طلبك أول ما يوصل، ولو في أي
+                مشكلة تقدر ترفض الاستلام أو تعمل إرجاع فوري مع مندوب الشحن في نفس اللحظة، مع
+                تحمّل تكلفة الشحن فقط.
+              </li>
+              <li>
+                <strong>بعد استلام الطلب:</strong> غير متاح الاسترجاع أو الاستبدال بعد مغادرة
+                المندوب لمكان التسليم، فبنرجوك تتأكد من معاينة القطعة كويس قبل ما المندوب يمشي.
+              </li>
+              <li>
+                <strong>نطاق التسليم:</strong> التسليم بيكون أمام المنزل، وطلوع القطعة لباب
+                الشقة ده اتفاق منفصل بينك وبين مندوب التوصيل مباشرة.
+              </li>
+            </ul>
+            <div className="policy-actions">
+              <button type="button" className="policy-reject" onClick={() => confirmPolicyAndCreateOrder(false)}>
+                رفض
+              </button>
+              <button type="button" className="policy-approve" onClick={() => confirmPolicyAndCreateOrder(true)}>
+                موافقة وإتمام الطلب
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {locationModalOpen && activeProduct && (
