@@ -1264,9 +1264,16 @@ function App() {
     }
   }, [hash, isAdminRoute, loadMyOrders]);
 
-  const mainTab = useMemo<"catalog" | "checkout" | "orders" | "track">(() => {
+  const mainTab = useMemo<
+    "catalog" | "details" | "checkout" | "orders" | "track"
+  >(() => {
     const clean = hash.replace("#", "");
-    if (clean === "checkout" || clean === "orders" || clean === "track") {
+    if (
+      clean === "details" ||
+      clean === "checkout" ||
+      clean === "orders" ||
+      clean === "track"
+    ) {
       return clean;
     }
     return "catalog";
@@ -1333,11 +1340,10 @@ function App() {
   const openProductDetails = async (product: Product) => {
     setActiveProduct(product);
     setActiveImageIndex(0);
-    window.history.replaceState(null, "", `/products/${product.slug}`);
+    window.history.replaceState(null, "", `/products/${product.slug}#details`);
+    setHash("#details");
     window.setTimeout(() => {
-      document
-        .getElementById("details")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }, 0);
 
     try {
@@ -2662,6 +2668,13 @@ function App() {
             الكتالوج
           </a>
           <a
+            href="#details"
+            className={mainTab === "details" ? "active" : ""}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            تفاصيل
+          </a>
+          <a
             href="#checkout"
             className={mainTab === "checkout" ? "active" : ""}
             onClick={() => setMobileMenuOpen(false)}
@@ -3126,7 +3139,7 @@ function App() {
                       type="button"
                       onClick={() => openProductDetails(product)}
                     >
-                      عرض التفاصيل
+                      التفاصيل
                     </button>
                     <button
                       type="button"
@@ -3159,8 +3172,25 @@ function App() {
           </div>
         )}
       </section>
+      </>
+      )}
 
-      {activeProduct &&
+      {mainTab === "details" && (
+      <div className="details-page">
+        {!activeProduct && (
+          <div className="details-empty-state">
+            <p className="eyebrow">تفاصيل المنتج</p>
+            <h2>اختر منتجًا من الكتالوج</h2>
+            <p className="muted">
+              اضغط "التفاصيل" على أي قطعة في الكتالوج عشان تشوف صورها
+              ومواصفاتها وخيارات الشحن كاملة هنا.
+            </p>
+            <a className="primary-link" href="#catalog">
+              تصفح الكتالوج
+            </a>
+          </div>
+        )}
+        {activeProduct &&
         (() => {
           const productImages = Array.isArray(activeProduct.images)
             ? activeProduct.images
@@ -3320,7 +3350,7 @@ function App() {
             </section>
           );
         })()}
-      </>
+      </div>
       )}
 
       {mainTab === "checkout" && (

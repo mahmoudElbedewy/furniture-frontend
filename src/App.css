@@ -98,6 +98,7 @@
 }
 
 .nav-bar nav a {
+  position: relative;
   font-size: 15px;
   letter-spacing: 2px;
   text-decoration: none;
@@ -107,6 +108,28 @@
 .nav-bar nav a:hover,
 .nav-bar button:hover {
   color: var(--cream);
+}
+
+.nav-bar nav a.active {
+  color: var(--cream);
+}
+
+.nav-bar nav a.active::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -10px;
+  height: 2px;
+  background: var(--gold);
+}
+
+.nav-bar nav.mobile-open a.active::after {
+  display: none;
+}
+
+.nav-bar nav.mobile-open a.active {
+  color: var(--gold);
 }
 
 .nav-actions {
@@ -2632,6 +2655,52 @@ button {
   margin-top: 4px;
   font-size: 11px;
   color: var(--muted);
+}
+
+/* Details tab — standalone product-details page (previously shown inline
+   under the catalog grid; now its own tab in the primary navigation). */
+.details-page {
+  min-height: calc(100svh - 76px);
+}
+
+.details-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 140px 28px 160px;
+  text-align: center;
+}
+
+.details-empty-state .eyebrow {
+  justify-content: center;
+}
+
+.details-empty-state h2 {
+  margin: 0;
+  color: var(--cream);
+  font-family: var(--serif);
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.1;
+}
+
+.details-empty-state p.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.details-empty-state .primary-link {
+  margin-top: 10px;
+}
+
+@media (max-width: 680px) {
+  .details-empty-state {
+    padding: 90px 20px 110px;
+  }
 }
 
 .cart-total.grand-total {
