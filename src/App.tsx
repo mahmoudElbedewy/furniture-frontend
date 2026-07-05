@@ -206,12 +206,12 @@ const heroImage =
 
 const money = (value?: string | number | null) => {
   const numeric = Number(value ?? 0);
-  return Number.isFinite(numeric)
+  const formatted = Number.isFinite(numeric)
     ? new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
+        maximumFractionDigits: 2,
       }).format(numeric)
-    : "$0.00";
+    : "0";
+  return `${formatted} ج.م`;
 };
 
 const getAuthHeaders = (): Record<string, string> => {
@@ -1263,6 +1263,14 @@ function App() {
       loadMyOrders();
     }
   }, [hash, isAdminRoute, loadMyOrders]);
+
+  const mainTab = useMemo<"catalog" | "checkout" | "orders" | "track">(() => {
+    const clean = hash.replace("#", "");
+    if (clean === "checkout" || clean === "orders" || clean === "track") {
+      return clean;
+    }
+    return "catalog";
+  }, [hash]);
 
   const chatContext = useMemo<ChatContext>(() => {
     if (!activeProduct) return { current_page: window.location.pathname };
@@ -2646,17 +2654,33 @@ function App() {
           aria-label="Primary navigation"
           className={mobileMenuOpen ? "mobile-open" : ""}
         >
-          <a href="#catalog" onClick={() => setMobileMenuOpen(false)}>
-            Catalog
+          <a
+            href="#catalog"
+            className={mainTab === "catalog" ? "active" : ""}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            الكتالوج
           </a>
-          <a href="#checkout" onClick={() => setMobileMenuOpen(false)}>
-            Checkout
+          <a
+            href="#checkout"
+            className={mainTab === "checkout" ? "active" : ""}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            الدفع
           </a>
-          <a href="#orders" onClick={() => setMobileMenuOpen(false)}>
-            My Orders
+          <a
+            href="#orders"
+            className={mainTab === "orders" ? "active" : ""}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            طلباتي
           </a>
-          <a href="#track" onClick={() => setMobileMenuOpen(false)}>
-            Track
+          <a
+            href="#track"
+            className={mainTab === "track" ? "active" : ""}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            تتبع الطلب
           </a>
           <button
             type="button"
@@ -2666,20 +2690,20 @@ function App() {
             }}
             className="nav-about-btn"
           >
-            About Us
+            من نحن
           </button>
           {customerProfile ? (
             <a href="#logout" onClick={() => setMobileMenuOpen(false)}>
-              Logout
+              تسجيل الخروج
             </a>
           ) : (
             <a href="#login" onClick={() => setMobileMenuOpen(false)}>
-              Login
+              تسجيل الدخول
             </a>
           )}
           {hasAdminToken && (
             <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
-              Admin
+              الإدارة
             </a>
           )}
         </nav>
@@ -2911,26 +2935,28 @@ function App() {
         </div>
       )}
 
+      {mainTab === "catalog" && (
+      <>
       <section className="hero-section">
         <img src={heroImage} alt="Modern living room" />
         <div className="hero-overlay" />
         <div className="hero-content">
-          <p className="eyebrow">Home Style Marketplace</p>
+          <p className="eyebrow">Home Style ماركت</p>
           <h1>Home Style</h1>
           <p>
-            Browse real products, ask support about any piece, and create orders
-            without leaving the storefront.
+            تصفح منتجات حقيقية، اسأل خدمة العملاء عن أي قطعة، وأنشئ طلبك من غير
+            ما تسيب المتجر.
           </p>
           <div className="hero-actions">
             <a className="primary-link" href="#catalog">
-              Load Catalog
+              تصفح الكتالوج
             </a>
             <button
               type="button"
               className="text-link"
               onClick={() => openContextChat()}
             >
-              Customer Service
+              خدمة العملاء
             </button>
           </div>
         </div>
@@ -2938,20 +2964,20 @@ function App() {
 
       <section className="stats-strip" aria-label="API integration status">
         <span>
-          <strong>{products.length}</strong>Loaded Products
+          <strong>{products.length}</strong>منتج متاح
         </span>
         <span>
-          <strong>{categories.length}</strong>Categories
+          <strong>{categories.length}</strong>تصنيف
         </span>
         <span>
-          <strong>{cart.length}</strong>Cart Items
+          <strong>{cart.length}</strong>في السلة
         </span>
       </section>
 
       <section id="catalog" className="product-section">
         <div className="section-heading">
-          <p className="eyebrow">01 - Catalog</p>
-          <h2>Browse the latest furniture in stock</h2>
+          <p className="eyebrow">٠١ - الكتالوج</p>
+          <h2>تصفح أحدث قطع الأثاث المتوفرة</h2>
         </div>
 
         <form
@@ -2965,8 +2991,8 @@ function App() {
             className="toolbar-material"
             value={materialFilter}
             onChange={(event) => setMaterialFilter(event.target.value)}
-            placeholder="Filter by material"
-            aria-label="Filter by material"
+            placeholder="فلترة حسب الخامة"
+            aria-label="فلترة حسب الخامة"
           />
           <input
             className="toolbar-min-price"
@@ -2974,8 +3000,8 @@ function App() {
             min="0"
             value={minPriceFilter}
             onChange={(event) => setMinPriceFilter(event.target.value)}
-            placeholder="Min price"
-            aria-label="Minimum price"
+            placeholder="أقل سعر"
+            aria-label="أقل سعر"
           />
           <input
             className="toolbar-max-price"
@@ -2983,16 +3009,16 @@ function App() {
             min="0"
             value={maxPriceFilter}
             onChange={(event) => setMaxPriceFilter(event.target.value)}
-            placeholder="Max price"
-            aria-label="Maximum price"
+            placeholder="أعلى سعر"
+            aria-label="أعلى سعر"
           />
           <select
             className="toolbar-category"
             value={selectedCategory}
             onChange={(event) => setSelectedCategory(event.target.value)}
-            aria-label="Filter category"
+            aria-label="فلترة حسب التصنيف"
           >
-            <option value="">All categories</option>
+            <option value="">كل التصنيفات</option>
             {categories.map((category) => (
               <option value={category.slug} key={category.id}>
                 {category.name}
@@ -3003,24 +3029,24 @@ function App() {
             className="toolbar-deposit"
             value={depositFilter}
             onChange={(event) => setDepositFilter(event.target.value)}
-            aria-label="Filter deposit products"
+            aria-label="فلترة منتجات الديبوزيت"
           >
-            <option value="">Any deposit</option>
-            <option value="true">Deposit only</option>
-            <option value="false">No deposit</option>
+            <option value="">كل المنتجات</option>
+            <option value="true">ديبوزيت فقط</option>
+            <option value="false">بدون ديبوزيت</option>
           </select>
           <select
             className="toolbar-shipping"
             value={shippingFilter}
             onChange={(event) => setShippingFilter(event.target.value)}
-            aria-label="Filter shipping coverage"
+            aria-label="فلترة نطاق الشحن"
           >
-            <option value="">Any shipping</option>
-            <option value="all_governorates">All governorates</option>
-            <option value="cairo_giza">Cairo and Giza only</option>
+            <option value="">أي شحن</option>
+            <option value="all_governorates">كل المحافظات</option>
+            <option value="cairo_giza">القاهرة والجيزة فقط</option>
           </select>
           <button type="submit" className="toolbar-submit">
-            Apply
+            تطبيق
           </button>
         </form>
 
@@ -3091,8 +3117,8 @@ function App() {
                     <p className="price">{money(product.final_price)}</p>
                     <h3>{product.title}</h3>
                     <p>
-                      {product.material ?? "Material not set"} /{" "}
-                      {product.color ?? "Color not set"}
+                      {product.material ?? "الخامة غير محددة"} /{" "}
+                      {product.color ?? "اللون غير محدد"}
                     </p>
                   </div>
                   <div className="card-actions">
@@ -3100,16 +3126,16 @@ function App() {
                       type="button"
                       onClick={() => openProductDetails(product)}
                     >
-                      View Details
+                      عرض التفاصيل
                     </button>
                     <button
                       type="button"
                       onClick={() => openContextChat(product)}
                     >
-                      Contact Customer Service
+                      تواصل مع خدمة العملاء
                     </button>
                     <button type="button" onClick={() => addToCart(product)}>
-                      Add to Cart
+                      أضف للسلة
                     </button>
                     <button
                       type="button"
@@ -3186,7 +3212,7 @@ function App() {
                 )}
               </div>
               <div className="detail-copy">
-                <p className="eyebrow">Selected Piece</p>
+                <p className="eyebrow">القطعة المختارة</p>
                 <h2>{activeProduct.title}</h2>
                 <p className="muted">{activeProduct.category_name}</p>
                 <p>
@@ -3266,13 +3292,13 @@ function App() {
                     type="button"
                     onClick={() => openContextChat(activeProduct)}
                   >
-                    Contact Customer Service
+                    تواصل مع خدمة العملاء
                   </button>
                   <button
                     type="button"
                     onClick={() => addToCart(activeProduct)}
                   >
-                    Add to Cart
+                    أضف للسلة
                   </button>
                   <button
                     type="button"
@@ -3294,14 +3320,16 @@ function App() {
             </section>
           );
         })()}
+      </>
+      )}
 
+      {mainTab === "checkout" && (
       <section id="checkout" className="checkout-section">
         <div>
-          <p className="eyebrow">02 - Orders</p>
-          <h2>Checkout</h2>
+          <p className="eyebrow">٠٢ - الطلبات</p>
+          <h2>الدفع</h2>
           <p>
-            Complete your order details and keep the team ready to follow up
-            when anything needs attention.
+            كمّل بيانات طلبك وسيبنا نتابع معاك أول بأول.
           </p>
         </div>
         <button
@@ -3309,11 +3337,11 @@ function App() {
           className="primary-link"
           onClick={() => setCheckoutOpen(true)}
         >
-          Open Checkout
+          فتح صفحة الدفع
         </button>
         {cart.length > 0 && (
           <div className="checkout-cart-display">
-            <h3>Your Cart</h3>
+            <h3>سلتك</h3>
             <div className="checkout-cart-list">
               {cart.map((item) => (
                 <div className="checkout-cart-item" key={item.product.id}>
@@ -3384,18 +3412,19 @@ function App() {
           </div>
         )}
       </section>
+      )}
 
+      {mainTab === "orders" && (
       <section id="orders" className="my-orders-section">
         <div>
-          <p className="eyebrow">03 - My Orders</p>
-          <h2>Your ordered products</h2>
+          <p className="eyebrow">٠٣ - طلباتي</p>
+          <h2>المنتجات اللي طلبتها</h2>
           <p>
-            Signed-in customers can see their previous orders here and track any
-            item.
+            العملاء المسجلين يقدروا يشوفوا طلباتهم السابقة هنا ويتابعوا أي منتج.
           </p>
         </div>
         <button type="button" className="text-link" onClick={loadMyOrders}>
-          Refresh Orders
+          تحديث الطلبات
         </button>
         {ordersLoading && (
           <div className="state-panel compact-state">
@@ -3420,7 +3449,7 @@ function App() {
               >
                 <div>
                   <strong>{order.order_number}</strong>
-                  <span>{order.status ?? "pending"}</span>
+                  <span>{order.status ?? "قيد الانتظار"}</span>
                 </div>
                 <div className="order-price-breakdown">
                   <div>
@@ -3444,27 +3473,29 @@ function App() {
                   ))}
                 </ul>
                 <button type="button" onClick={() => trackExistingOrder(order)}>
-                  Track Order
+                  تتبع الطلب
                 </button>
               </article>
             ))}
           </div>
         )}
       </section>
+      )}
 
+      {mainTab === "track" && (
       <section id="track" className="tracking-section">
         <div>
-          <p className="eyebrow">04 - Tracking</p>
-          <h2>Track an order</h2>
+          <p className="eyebrow">٠٤ - التتبع</p>
+          <h2>تتبع الطلب</h2>
         </div>
         <form className="tracking-form" onSubmit={trackOrder}>
           <input
             value={trackingNumber}
             onChange={(event) => setTrackingNumber(event.target.value)}
-            placeholder="Order number"
-            aria-label="Order number"
+            placeholder="رقم الطلب"
+            aria-label="رقم الطلب"
           />
-          <button type="submit">Track</button>
+          <button type="submit">تتبع</button>
         </form>
         {trackedOrder && (
           <div className="result-panel">
@@ -3474,6 +3505,7 @@ function App() {
           </div>
         )}
       </section>
+      )}
 
       <button
         className="chat-launcher"
@@ -3487,7 +3519,7 @@ function App() {
       {cartOpen && (
         <aside className="side-panel" aria-label="Cart">
           <header>
-            <h2>Cart</h2>
+            <h2>السلة</h2>
             <button
               type="button"
               onClick={() => setCartOpen(false)}
@@ -3497,7 +3529,7 @@ function App() {
             </button>
           </header>
           {cart.length === 0 ? (
-            <p className="empty-copy">Your cart is empty.</p>
+            <p className="empty-copy">السلة فارغة.</p>
           ) : (
             <>
               <div className="cart-list">
@@ -3508,7 +3540,7 @@ function App() {
                       <span>{money(item.product.final_price)}</span>
                       {item.selectedLocation && (
                         <small className="shipping-info">
-                          Shipping to: {item.selectedLocation} ({money(item.shippingPrice)})
+                          الشحن إلى: {item.selectedLocation} ({money(item.shippingPrice)})
                         </small>
                       )}
                     </div>
@@ -3535,17 +3567,17 @@ function App() {
                 ))}
               </div>
               <div className="cart-total">
-                <span>Subtotal</span>
+                <span>المجموع الفرعي</span>
                 <strong>{money(subtotal)}</strong>
               </div>
               {totalShipping > 0 && (
                 <div className="cart-total">
-                  <span>Shipping</span>
+                  <span>الشحن</span>
                   <strong>{money(totalShipping)}</strong>
                 </div>
               )}
               <div className="cart-total grand-total">
-                <span>Total</span>
+                <span>الإجمالي</span>
                 <strong>{money(grandTotal)}</strong>
               </div>
               <div className="cart-checkout-buttons">
@@ -3557,7 +3589,7 @@ function App() {
                     setCartOpen(false);
                   }}
                 >
-                  Checkout
+                  إتمام الدفع
                 </button>
                 <button
                   type="button"
@@ -3587,7 +3619,7 @@ function App() {
         <aside className="modal-panel" aria-label="Checkout">
           <form className="checkout-form" onSubmit={submitOrder}>
             <header>
-              <h2>Checkout</h2>
+              <h2>الدفع</h2>
               <button
                 type="button"
                 onClick={() => setCheckoutOpen(false)}
@@ -3608,20 +3640,20 @@ function App() {
               placeholder="العنوان بالتفصيل الممل"
               required
             />
-            <textarea name="notes" placeholder="Notes" />
+            <textarea name="notes" placeholder="ملاحظات" />
             <div className="checkout-summary">
               <div className="summary-row">
-                <span>Subtotal</span>
+                <span>المجموع الفرعي</span>
                 <strong>{money(subtotal)}</strong>
               </div>
               {totalShipping > 0 && (
                 <div className="summary-row">
-                  <span>Shipping</span>
+                  <span>الشحن</span>
                   <strong>{money(totalShipping)}</strong>
                 </div>
               )}
               <div className="summary-row total">
-                <span>Total</span>
+                <span>الإجمالي</span>
                 <strong>{money(grandTotal)}</strong>
               </div>
             </div>
@@ -3668,7 +3700,7 @@ function App() {
             )}
 
             <button type="submit" className="panel-primary">
-              Create Order
+              إنشاء الطلب
             </button>
           </form>
         </aside>
@@ -3714,7 +3746,7 @@ function App() {
         <aside className="modal-panel" aria-label="Select shipping location">
           <div className="location-modal">
             <header>
-              <h2>Select Shipping Location</h2>
+              <h2>اختيار منطقة الشحن</h2>
               <button
                 type="button"
                 onClick={() => setLocationModalOpen(false)}
@@ -3738,12 +3770,12 @@ function App() {
                     )}
                   >
                     <span>{rate.governorate_name}{rate.area_name ? ` - ${rate.area_name}` : ''}</span>
-                    <span className="location-price">{rate.price === '0' ? 'Free' : money(rate.price)}</span>
+                    <span className="location-price">{rate.price === '0' ? 'مجاني' : money(rate.price)}</span>
                   </button>
                 ))}
               </div>
             ) : (
-              <p className="muted">No shipping options available for this product.</p>
+              <p className="muted">لا توجد خيارات شحن متاحة لهذا المنتج.</p>
             )}
           </div>
         </aside>
@@ -3753,8 +3785,8 @@ function App() {
         <aside className="chat-panel" aria-label="Customer service chat">
           <header>
             <div>
-              <p className="eyebrow">Context-Aware AI</p>
-              <h2>Customer Service</h2>
+              <p className="eyebrow">مساعد ذكي</p>
+              <h2>خدمة العملاء</h2>
             </div>
             <button
               type="button"
@@ -3765,8 +3797,8 @@ function App() {
             </button>
           </header>
           <div className="context-pill">
-            Viewing: {chatContext.product_name ?? "Storefront"}
-            <span>{chatConnected ? "Live" : "Fallback"}</span>
+            بتتصفح: {chatContext.product_name ?? "المتجر"}
+            <span>{chatConnected ? "متصل" : "غير متصل"}</span>
           </div>
           {chatError && <p className="inline-error">{chatError}</p>}
           <div className="messages">
@@ -3804,7 +3836,7 @@ function App() {
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask about this product..."
+              placeholder="اسأل عن هذا المنتج..."
               aria-label="Chat message"
             />
             <button type="submit" aria-label="Send message">
@@ -3812,14 +3844,14 @@ function App() {
             </button>
           </form>
           <button type="button" className="reset-chat" onClick={resetChat}>
-            Reset conversation
+            بدء محادثة جديدة
           </button>
         </aside>
       )}
 
       {orderResult && (
         <div className="toast success">
-          Order created: {orderResult.order_number ?? orderResult.id}
+          تم إنشاء الطلب: {orderResult.order_number ?? orderResult.id}
           <button type="button" onClick={() => setOrderResult(null)}>
             OK
           </button>
