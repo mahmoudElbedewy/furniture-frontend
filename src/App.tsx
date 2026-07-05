@@ -422,7 +422,44 @@ const normalizeConversation = (
   messages: (conversation.messages ?? []).map(normalizeMessage),
 });
 
-async function request<T>(path: string, init: RequestInit = {}) {
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem("furniture_refresh_token");
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    if (!response.ok) throw new Error("refresh failed");
+
+    const data = await response.json();
+    localStorage.setItem("furniture_access_token", data.access);
+    if (data.refresh) {
+      localStorage.setItem("furniture_refresh_token", data.refresh);
+    }
+    return data.access as string;
+  } catch {
+    localStorage.removeItem("furniture_access_token");
+    localStorage.removeItem("furniture_refresh_token");
+    return null;
+  }
+}
+
+function getRefreshedToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, isRetry = false) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
   const authHeaders = getAuthHeaders();
@@ -448,11 +485,17 @@ async function request<T>(path: string, init: RequestInit = {}) {
     headers,
   });
 
+  if (response.status === 401 && (requiresAuth || shouldSendOptionalAuth) && !isRetry) {
+    const newAccessToken = await getRefreshedToken();
+    if (newAccessToken) {
+      return request<T>(path, init, true);
+    }
+  }
+
   if (!response.ok) {
     const payload = await safeJson(response).catch(() => null);
     let detail = payload?.detail ?? payload?.message ?? response.statusText;
 
-    // Handle Django validation errors
     if (payload && typeof payload === 'object') {
       const errors = Object.values(payload).flat();
       if (errors.length > 0 && typeof errors[0] === 'string') {
