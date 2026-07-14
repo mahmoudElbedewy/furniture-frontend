@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import "./App.css";
+import AnalyticsDashboard from "./components/AnalyticsDashboard/AnalyticsDashboard";
 
 type Category = {
   id: number;
@@ -458,6 +459,13 @@ function getRefreshedToken(): Promise<string | null> {
   }
   return refreshPromise;
 }
+const getStoredIdentityToken = () =>
+  localStorage.getItem("furniture_identity_token");
+
+const setStoredIdentity = (identifier: string, identityToken: string) => {
+  localStorage.setItem("furniture_identifier", identifier);
+  localStorage.setItem("furniture_identity_token", identityToken);
+};
 
 async function request<T>(path: string, init: RequestInit = {}, isRetry = false) {
   const headers = new Headers(init.headers);
@@ -471,8 +479,10 @@ async function request<T>(path: string, init: RequestInit = {}, isRetry = false)
     path.startsWith("/api/orders/mine/");
 
   const shouldSendOptionalAuth =
-    Boolean(authHeaders.Authorization) &&
-    (path === "/api/orders/" || path.startsWith("/api/chat/"));
+  Boolean(authHeaders.Authorization) &&
+  (path === "/api/orders/" ||
+    path.startsWith("/api/chat/") ||
+    path.startsWith("/api/catalog/favorites/"));
 
   if (requiresAuth || shouldSendOptionalAuth) {
     Object.entries(authHeaders).forEach(([key, value]) => {
@@ -528,18 +538,19 @@ const api = {
     return request<Product>(`/api/catalog/products/${slug}/`);
   },
   async startChat(product?: Product, forceNew = false) {
-    const sessionId =
-      localStorage.getItem("furniture_session_id") ?? crypto.randomUUID();
-    const emailKey = localStorage.getItem("furniture_customer_email_key");
+    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+    const identityToken = isAuthenticated ? null : await this.ensureIdentity();
 
     const payload = await request<
-      Record<string, string> & { session_id?: string; customer_identifier?: string }
-    >("/api/chat/start/", {
+  Record<string, string> & {
+    identifier?: string;
+    identity_token?: string;
+    customer_identifier?: string;
+  }
+>("/api/chat/start/", {
       method: "POST",
       body: JSON.stringify({
-        session_id: sessionId,
-        customer_identifier: emailKey ?? sessionId,
-        phone_number: localStorage.getItem("furniture_customer_phone"),
+        identity_token: identityToken,
         customer_name:
           localStorage.getItem("furniture_customer_name") ?? "Guest Customer",
         product_id: product?.id,
@@ -547,9 +558,8 @@ const api = {
       }),
     });
 
-    const returnedSession = payload?.session_id ?? payload?.customer_identifier;
-    if (returnedSession) {
-      localStorage.setItem("furniture_session_id", returnedSession);
+    if (payload?.identity_token) {
+      setStoredIdentity(payload.customer_identifier ?? "", payload.identity_token);
     }
 
     const conversationId = payload?.id ?? payload?.conversation_id;
@@ -558,45 +568,27 @@ const api = {
     return conversationId;
   },
   async sendChatMessage(
-    conversationId: string,
-    payload: {
-      message: string;
-      sender_type: "customer";
-      context: ChatContext;
+  conversationId: string,
+  payload: { message: string; sender_type: "customer"; context: ChatContext },
+) {
+  const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+  const identityToken = isAuthenticated ? null : getStoredIdentityToken();
+  return request<{ messages: ChatMessage[]; agent_error?: string }>(
+    `/api/chat/${conversationId}/send/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ ...payload, identity_token: identityToken }),
     },
-  ) {
-    const customerIdentifier =
-      localStorage.getItem("furniture_customer_email_key") ||
-      localStorage.getItem("furniture_session_id") ||
-      localStorage.getItem("furniture_customer_phone");
-    return request<{ messages: ChatMessage[]; agent_error?: string }>(
-      `/api/chat/${conversationId}/send/`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          ...payload,
-          customer_identifier: customerIdentifier,
-          session_id: localStorage.getItem("furniture_session_id"),
-        }),
-      },
-    );
-  },
+  );
+},
   async getChatHistory(conversationId: string) {
-    const customerIdentifier =
-      localStorage.getItem("furniture_customer_email_key") ||
-      localStorage.getItem("furniture_session_id") ||
-      localStorage.getItem("furniture_customer_phone");
-    const payload = await request<{
-      conversation_status: string;
-      messages: ChatMessage[];
-    }>(
-      `/api/chat/${conversationId}/history/?customer_identifier=${encodeURIComponent(customerIdentifier || "")}`,
-    );
-    return {
-      ...payload,
-      messages: payload.messages.map(normalizeMessage),
-    };
-  },
+  const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+  const identityToken = isAuthenticated ? "" : getStoredIdentityToken() ?? "";
+  const payload = await request<{ conversation_status: string; messages: ChatMessage[] }>(
+    `/api/chat/${conversationId}/history/?identity_token=${encodeURIComponent(identityToken)}`,
+  );
+  return { ...payload, messages: payload.messages.map(normalizeMessage) };
+},
   async fetchProductCards(endpoint: string) {
     return request<{ products: ChatProductCard[] }>(endpoint);
   },
@@ -653,6 +645,7 @@ const api = {
       ),
     );
   },
+
   async login(email: string, password: string) {
     return request<{ access: string; refresh: string }>("/api/auth/login/", {
       method: "POST",
@@ -670,6 +663,18 @@ const api = {
       body: JSON.stringify(payload),
     });
   },
+  async ensureIdentity() {
+  const existingToken = getStoredIdentityToken();
+  const payload = await request<{ identifier: string; identity_token: string }>(
+    "/api/auth/identity/",
+    {
+      method: "POST",
+      body: JSON.stringify(existingToken ? { identity_token: existingToken } : {}),
+    },
+  );
+  setStoredIdentity(payload.identifier, payload.identity_token);
+  return payload.identity_token;
+},
   async getAgentSettings() {
     return request<AgentSettingsState>("/api/admin/agent-settings/");
   },
@@ -725,20 +730,20 @@ const api = {
     );
     return normalizeMessage(message);
   },
-  async toggleFavorite(productId: string, customerIdentifier: string) {
+  async toggleFavorite(productId: string, identityToken: string) {
     return request<{ message?: string } | { id: string; product: string; customer_identifier: string; created_at: string }>("/api/catalog/favorites/toggle/", {
       method: "POST",
-      body: JSON.stringify({ product_id: productId, customer_identifier: customerIdentifier }),
+      body: JSON.stringify({ product_id: productId, customer_identifier: identityToken }),
     });
   },
-  async checkFavorite(productId: string, customerIdentifier: string) {
+  async checkFavorite(productId: string, identityToken: string) {
     return request<{ is_favorited: boolean }>(
-      `/api/catalog/favorites/check/?product_id=${encodeURIComponent(productId)}&customer_identifier=${encodeURIComponent(customerIdentifier)}`,
+      `/api/catalog/favorites/check/?product_id=${encodeURIComponent(productId)}&customer_identifier=${encodeURIComponent(identityToken)}`,
     );
   },
-  async listFavorites(customerIdentifier: string) {
+  async listFavorites(identityToken: string) {
     return request<Array<{ id: string; product: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>(
-      `/api/catalog/favorites/?customer_identifier=${encodeURIComponent(customerIdentifier)}`,
+      `/api/catalog/favorites/?customer_identifier=${encodeURIComponent(identityToken)}`,
     );
   },
   async uploadAgentImages(files: FileList) {
@@ -893,6 +898,7 @@ function App() {
   ]);
   const socketRef = useRef<WebSocket | null>(null);
 
+  const isAnalyticsRoute = hash === "#analytics";
   const isAdminRoute =
     hash === "#admin" || window.location.pathname.startsWith("/admin-panel");
   const isAuthRoute =
@@ -1028,18 +1034,19 @@ function App() {
     loadCustomerProfile();
   }, [loadCustomerProfile]);
 
-  const getCustomerIdentifier = useCallback(() => {
-    return (
-      customerProfile?.email?.split("@")[0].toLowerCase() ||
-      localStorage.getItem("furniture_customer_email_key") ||
-      localStorage.getItem("furniture_session_id") ||
-      localStorage.getItem("furniture_customer_phone") ||
-      "guest"
-    );
+  const getCustomerIdentifier = useCallback(async () => {
+    if (customerProfile) return "";
+    const existing = localStorage.getItem("furniture_identity_token");
+    if (existing) return existing;
+    try {
+      return await api.ensureIdentity();
+    } catch {
+      return "";
+    }
   }, [customerProfile]);
 
   const loadFavorites = useCallback(async () => {
-    const customerIdentifier = getCustomerIdentifier();
+    const customerIdentifier = await getCustomerIdentifier();
     if (!customerIdentifier) return;
 
     try {
@@ -1056,7 +1063,7 @@ function App() {
   }, [getCustomerIdentifier]);
 
   const toggleFavorite = useCallback(async (productId: string) => {
-    const customerIdentifier = getCustomerIdentifier();
+    const customerIdentifier = await getCustomerIdentifier();
     if (!customerIdentifier) return;
 
     const lastClick = favoriteClicks[productId] || 0;
@@ -1101,7 +1108,11 @@ function App() {
   useEffect(() => {
     if (!conversationId) return;
 
-    const socket = new WebSocket(`${WS_BASE_URL}/ws/chat/${conversationId}/`);
+    const accessToken = localStorage.getItem("furniture_access_token");
+    const wsUrl = accessToken 
+      ? `${WS_BASE_URL}/ws/chat/${conversationId}/?token=${accessToken}`
+      : `${WS_BASE_URL}/ws/chat/${conversationId}/`;
+    const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
 
     setChatConnected(false);
@@ -1442,7 +1453,6 @@ function App() {
     setChatError("");
 
     try {
-      // Always start a new conversation to ensure isolation
       const id = await api.startChat(contextProduct);
       if (conversationId && conversationId !== id) {
         socketRef.current?.close();
@@ -1481,13 +1491,13 @@ function App() {
 
       if (socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(
-          JSON.stringify({
-            ...payload,
-            customer_identifier:
-              localStorage.getItem("furniture_customer_email_key") ||
-              localStorage.getItem("furniture_session_id"),
-          }),
-        );
+  JSON.stringify({
+    ...payload,
+    identity_token: customerProfile
+      ? null
+      : localStorage.getItem("furniture_identity_token"),
+  }),
+);
       } else {
         const response = await api.sendChatMessage(
           activeConversationId,
@@ -2084,6 +2094,12 @@ function App() {
     );
   }
 
+  if (isAnalyticsRoute && hasAdminToken) {
+    return (
+      <AnalyticsDashboard onBack={() => { window.location.hash = '#catalog'; setHash('#catalog'); }} />
+    );
+  }
+
   if (isAdminRoute) {
     return (
       <main className="site-shell admin-shell">
@@ -2093,6 +2109,7 @@ function App() {
           <nav aria-label="Admin navigation">
             <a href="#catalog">Storefront</a>
             <a href="#admin">Admin Panel</a>
+            <a href="#analytics">لوحة التحليلات</a>
           </nav>
           <div className="nav-actions">
             {hasAdminToken && (
@@ -2737,9 +2754,14 @@ function App() {
             </a>
           )}
           {hasAdminToken && (
-            <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
-              الإدارة
-            </a>
+            <>
+              <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
+                الإدارة
+              </a>
+              <a href="#analytics" onClick={() => setMobileMenuOpen(false)}>
+                لوحة التحليلات
+              </a>
+            </>
           )}
         </nav>
         <div className="nav-actions">
@@ -2803,7 +2825,7 @@ function App() {
               aria-label="Contact us"
               className={`nav-contact-btn ${contactDropdownOpen ? "active" : ""}`}
             >
-              تواصل معنا
+              <span className="contact-text">تواصل معنا</span>
               <MessageCircle size={16} />
             </button>
             {contactDropdownOpen && (
