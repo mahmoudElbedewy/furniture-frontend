@@ -798,6 +798,12 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInputOpen, setSearchInputOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [contactDropdownOpen, setContactDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
@@ -834,6 +840,7 @@ function App() {
     },
   ]);
   const [draft, setDraft] = useState("");
+  const [savedScrollPos, setSavedScrollPos] = useState(0);
   const [customerProfile, setCustomerProfile] =
     useState<CustomerProfile | null>(null);
   const [authEmail, setAuthEmail] = useState("");
@@ -911,6 +918,19 @@ function App() {
     setMobileMenuOpen(false);
   }, [hash]);
 
+  // Reset current page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    selectedCategory,
+    materialFilter,
+    depositFilter,
+    shippingFilter,
+    minPriceFilter,
+    maxPriceFilter,
+    searchQuery,
+  ]);
+
   // Debounce search query - only when on catalog page and search query changes
   useEffect(() => {
     if (hash !== "#catalog" || !searchQuery.trim()) return;
@@ -928,7 +948,7 @@ function App() {
     setApiError("");
 
     try {
-      const params = new URLSearchParams({ page_size: "100" });
+      const params = new URLSearchParams({ page: currentPage.toString() });
       if (selectedCategory) params.set("category", selectedCategory);
       if (materialFilter.trim()) params.set("material", materialFilter.trim());
       if (depositFilter) params.set("has_deposit", depositFilter);
@@ -949,21 +969,12 @@ function App() {
       let productResults: Product[] = [];
       if (Array.isArray(productPayload)) {
         productResults = productPayload;
+        setTotalPages(1);
+        setTotalProducts(productPayload.length);
       } else {
         productResults = productPayload.results || [];
-        // Load all pages
-        let nextPage = productPayload.next;
-        while (nextPage) {
-          const nextUrl = new URL(nextPage);
-          const nextPageParams = nextUrl.searchParams;
-          const nextPayload = await api.listProducts(nextPageParams) as PaginatedProducts;
-          if (Array.isArray(nextPayload)) {
-            productResults = productResults.concat(nextPayload);
-            break;
-          }
-          productResults = productResults.concat(nextPayload.results || []);
-          nextPage = nextPayload.next;
-        }
+        setTotalPages(Math.ceil((productPayload.count || 0) / 12) || 1);
+        setTotalProducts(productPayload.count || 0);
       }
 
       setCategories(categoryPayload);
@@ -988,6 +999,7 @@ function App() {
     selectedCategory,
     shippingFilter,
     searchQuery,
+    currentPage,
   ]);
 
   const loadCustomerProfile = useCallback(async () => {
@@ -1338,6 +1350,7 @@ function App() {
   };
 
   const openProductDetails = async (product: Product) => {
+    setSavedScrollPos(window.scrollY);
     setActiveProduct(product);
     setActiveImageIndex(0);
     window.history.replaceState(null, "", `/products/${product.slug}#details`);
@@ -1355,6 +1368,15 @@ function App() {
         text: `Could not load product details: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
+  };
+
+  const closeProductDetails = () => {
+    window.history.pushState(null, "", "/#catalog");
+    setHash("#catalog");
+    setActiveProduct(null);
+    window.setTimeout(() => {
+      window.scrollTo({ top: savedScrollPos, behavior: "instant" });
+    }, 0);
   };
 
   const addToCart = (product: Product) => {
@@ -2770,32 +2792,47 @@ function App() {
             <Heart size={20} />
             <span>{favorites.size}</span>
           </button>
-          <a
-            href="https://wa.me/201503466584"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Contact on WhatsApp"
-            className="social-btn whatsapp-btn"
+          
+          <div
+            className="contact-dropdown-container"
+            onMouseLeave={() => setContactDropdownOpen(false)}
           >
-            <svg width="20" height="20" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="30" fill="#25D366"/>
-              <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
-            </svg>
-            <span>واتساب</span>
-          </a>
-          <a
-            href="https://www.facebook.com/profile.php?id=61591355288049"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Visit Facebook page"
-            className="social-btn facebook-btn"
-          >
-            <svg width="20" height="20" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="30" cy="30" r="30" fill="#1877F2"/>
-              <path fill="#FFFFFF" d="M33.5 31.5h4l.6-4.5h-4.6v-2.9c0-1.3.4-2.2 2.2-2.2h2.4V17.4c-.4-.1-1.9-.2-3.5-.2-3.5 0-5.9 2.1-5.9 6v3.3H25v4.5h3.7V43h5V31.5z"/>
-            </svg>
-            <span>فيسبوك</span>
-          </a>
+            <button
+              type="button"
+              onClick={() => setContactDropdownOpen(!contactDropdownOpen)}
+              aria-label="Contact us"
+              className={`nav-contact-btn ${contactDropdownOpen ? "active" : ""}`}
+            >
+              تواصل معنا
+              <MessageCircle size={16} />
+            </button>
+            {contactDropdownOpen && (
+              <div className="contact-dropdown">
+                <a
+                  href="https://wa.me/201503466584"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", marginLeft: "8px" }}>
+                    <circle cx="30" cy="30" r="30" fill="#25D366"/>
+                    <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
+                  </svg>
+                  <span>واتساب</span>
+                </a>
+                <a
+                  href="https://www.facebook.com/profile.php?id=61591355288049"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", marginLeft: "8px" }}>
+                    <circle cx="30" cy="30" r="30" fill="#1877F2"/>
+                    <path fill="#FFFFFF" d="M33.5 31.5h4l.6-4.5h-4.6v-2.9c0-1.3.4-2.2 2.2-2.2h2.4V17.4c-.4-.1-1.9-.2-3.5-.2-3.5 0-5.9 2.1-5.9 6v3.3H25v4.5h3.7V43h5V31.5z"/>
+                  </svg>
+                  <span>فيسبوك</span>
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -2977,7 +3014,7 @@ function App() {
 
       <section className="stats-strip" aria-label="API integration status">
         <span>
-          <strong>{products.length}</strong>منتج متاح
+          <strong>{totalProducts}</strong>منتج متاح
         </span>
         <span>
           <strong>{categories.length}</strong>تصنيف
@@ -2987,81 +3024,117 @@ function App() {
         </span>
       </section>
 
+
       <section id="catalog" className="product-section">
-        <div className="section-heading">
-          <p className="eyebrow">٠١ - الكتالوج</p>
-          <h2>تصفح أحدث قطع الأثاث المتوفرة</h2>
+        <div className="section-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "16px" }}>
+          <div>
+            <p className="eyebrow">٠١ - الكتالوج</p>
+            <h2>تصفح أحدث قطع الأثاث المتوفرة</h2>
+          </div>
+          <button
+            type="button"
+            className="filter-toggle-btn"
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 20px",
+              background: filtersOpen ? "var(--gold)" : "rgba(255,255,255,0.05)",
+              color: filtersOpen ? "#17130f" : "var(--cream)",
+              border: "1px solid var(--line)",
+              fontFamily: "var(--sans)",
+              fontSize: "14px",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 180ms ease"
+            }}
+          >
+            <Settings size={16} />
+            {filtersOpen ? "إخفاء الفلاتر" : "تصفية المنتجات"}
+          </button>
         </div>
 
-        <form
-          className="toolbar"
-          onSubmit={(event) => {
-            event.preventDefault();
-            loadProducts();
-          }}
-        >
-          <input
-            className="toolbar-material"
-            value={materialFilter}
-            onChange={(event) => setMaterialFilter(event.target.value)}
-            placeholder="فلترة حسب الخامة"
-            aria-label="فلترة حسب الخامة"
-          />
-          <input
-            className="toolbar-min-price"
-            type="number"
-            min="0"
-            value={minPriceFilter}
-            onChange={(event) => setMinPriceFilter(event.target.value)}
-            placeholder="أقل سعر"
-            aria-label="أقل سعر"
-          />
-          <input
-            className="toolbar-max-price"
-            type="number"
-            min="0"
-            value={maxPriceFilter}
-            onChange={(event) => setMaxPriceFilter(event.target.value)}
-            placeholder="أعلى سعر"
-            aria-label="أعلى سعر"
-          />
-          <select
-            className="toolbar-category"
-            value={selectedCategory}
-            onChange={(event) => setSelectedCategory(event.target.value)}
-            aria-label="فلترة حسب التصنيف"
+        {filtersOpen && (
+          <form
+            className="toolbar"
+            onSubmit={(event) => {
+              event.preventDefault();
+              loadProducts();
+            }}
           >
-            <option value="">كل التصنيفات</option>
-            {categories.map((category) => (
-              <option value={category.slug} key={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="toolbar-deposit"
-            value={depositFilter}
-            onChange={(event) => setDepositFilter(event.target.value)}
-            aria-label="فلترة منتجات الديبوزيت"
-          >
-            <option value="">كل المنتجات</option>
-            <option value="true">ديبوزيت فقط</option>
-            <option value="false">بدون ديبوزيت</option>
-          </select>
-          <select
-            className="toolbar-shipping"
-            value={shippingFilter}
-            onChange={(event) => setShippingFilter(event.target.value)}
-            aria-label="فلترة نطاق الشحن"
-          >
-            <option value="">أي شحن</option>
-            <option value="all_governorates">كل المحافظات</option>
-            <option value="cairo_giza">القاهرة والجيزة فقط</option>
-          </select>
-          <button type="submit" className="toolbar-submit">
-            تطبيق
-          </button>
-        </form>
+            <select
+              className="toolbar-category"
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value)}
+              aria-label="فلترة حسب التصنيف"
+            >
+              <option value="">كل التصنيفات</option>
+              {categories.map((category) => (
+                <option value={category.slug} key={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <input
+              className="toolbar-min-price"
+              type="number"
+              min="0"
+              value={minPriceFilter}
+              onChange={(event) => setMinPriceFilter(event.target.value)}
+              placeholder="أقل سعر"
+              aria-label="أقل سعر"
+            />
+            <input
+              className="toolbar-max-price"
+              type="number"
+              min="0"
+              value={maxPriceFilter}
+              onChange={(event) => setMaxPriceFilter(event.target.value)}
+              placeholder="أعلى سعر"
+              aria-label="أعلى سعر"
+            />
+            <button
+              type="button"
+              className="toolbar-toggle-filters"
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+            >
+              {filtersExpanded ? "إخفاء الفلاتر" : "فلاتر أكتر …"}
+            </button>
+            <div className={`toolbar-extra-filters${filtersExpanded ? " expanded" : ""}`}>
+              <input
+                className="toolbar-material"
+                value={materialFilter}
+                onChange={(event) => setMaterialFilter(event.target.value)}
+                placeholder="فلترة حسب الخامة"
+                aria-label="فلترة حسب الخامة"
+              />
+              <select
+                className="toolbar-deposit"
+                value={depositFilter}
+                onChange={(event) => setDepositFilter(event.target.value)}
+                aria-label="فلترة منتجات الديبوزيت"
+              >
+                <option value="">كل المنتجات</option>
+                <option value="true">ديبوزيت فقط</option>
+                <option value="false">بدون ديبوزيت</option>
+              </select>
+              <select
+                className="toolbar-shipping"
+                value={shippingFilter}
+                onChange={(event) => setShippingFilter(event.target.value)}
+                aria-label="فلترة نطاق الشحن"
+              >
+                <option value="">أي شحن</option>
+                <option value="all_governorates">كل المحافظات</option>
+                <option value="cairo_giza">القاهرة والجيزة فقط</option>
+              </select>
+            </div>
+            <button type="submit" className="toolbar-submit">
+              تطبيق
+            </button>
+          </form>
+        )}
 
         {loading && (
           <div className="state-panel">
@@ -3135,40 +3208,130 @@ function App() {
                     </p>
                   </div>
                   <div className="card-actions">
+                    <div className="card-actions-row">
+                      <button
+                        type="button"
+                        className="outline-btn"
+                        onClick={() => openProductDetails(product)}
+                      >
+                        التفاصيل
+                      </button>
+                      <button
+                        type="button"
+                        className="outline-btn"
+                        onClick={() => openContextChat(product)}
+                      >
+                        تواصل معنا
+                      </button>
+                    </div>
+
                     <button
                       type="button"
-                      onClick={() => openProductDetails(product)}
-                    >
-                      التفاصيل
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openContextChat(product)}
-                    >
-                      تواصل مع خدمة العملاء
-                    </button>
-                    <button type="button" onClick={() => addToCart(product)}>
-                      أضف للسلة
-                    </button>
-                    <button
-                      type="button"
-                      className="whatsapp-order-btn"
+                      className="outline-btn whatsapp-outline-btn"
                       onClick={() => {
                         const message = `مرحباً، أريد طلب هذا المنتج:\n\n${product.title}\n\nالسعر: ${money(product.final_price)}\n\nالرابط: ${window.location.href}#catalog`;
                         const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
                         window.open(whatsappUrl, '_blank');
                       }}
+                      style={{ width: "100%", minHeight: "44px" }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+                      <svg width="14" height="14" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="30" cy="30" r="30" fill="#25D366"/>
                         <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
                       </svg>
                       طلب عبر واتساب
                     </button>
+
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={() => addToCart(product)}
+                    >
+                      أضف للسلة
+                    </button>
                   </div>
                 </article>
               );
             })}
+          </div>
+        )}
+
+        {!loading && !apiError && totalPages > 1 && (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "42px", flexWrap: "nowrap", width: "100%", overflow: "visible" }}>
+            <button
+              onClick={() => {
+                setCurrentPage(p => Math.max(1, p - 1));
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              disabled={currentPage === 1}
+              className="page-nav-btn prev"
+              style={{ opacity: currentPage === 1 ? 0.3 : 1 }}
+            >
+              السابق
+            </button>
+
+            {(() => {
+              const pages = [];
+              const maxVisible = 5;
+              if (totalPages <= maxVisible) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                let start = Math.max(1, currentPage - 2);
+                let end = Math.min(totalPages, currentPage + 2);
+                if (start === 1) {
+                  end = 5;
+                } else if (end === totalPages) {
+                  start = totalPages - 4;
+                }
+                for (let i = start; i <= end; i++) {
+                  pages.push(i);
+                }
+              }
+              return pages;
+            })().map((pageNum) => {
+              const distance = Math.abs(pageNum - currentPage);
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => {
+                    setCurrentPage(pageNum);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  style={{
+                    minWidth: "36px",
+                    height: "36px",
+                    padding: "0 4px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: currentPage === pageNum ? "var(--gold)" : "transparent",
+                    color: currentPage === pageNum ? "#17130f" : "var(--cream)",
+                    border: currentPage === pageNum ? "1px solid var(--gold)" : "1px solid var(--line)",
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontFamily: "var(--sans)",
+                    fontSize: distance === 0 ? "14px" : distance === 1 ? "12px" : "10px",
+                    opacity: distance === 0 ? 1 : distance === 1 ? 0.6 : 0.25,
+                    transform: `scale(${distance === 0 ? 1 : distance === 1 ? 0.9 : 0.8})`,
+                    transition: "all 150ms ease"
+                  }}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={() => {
+                setCurrentPage(p => Math.min(totalPages, p + 1));
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              disabled={currentPage === totalPages}
+              className="page-nav-btn next"
+              style={{ opacity: currentPage === totalPages ? 0.3 : 1 }}
+            >
+              التالي
+            </button>
           </div>
         )}
       </section>
@@ -3177,6 +3340,17 @@ function App() {
 
       {mainTab === "details" && (
       <div className="details-page">
+        <div className="details-header" style={{ padding: "16px 24px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)" }}>
+          <button 
+            type="button" 
+            className="text-link-btn" 
+            onClick={closeProductDetails}
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "16px", color: "var(--cream)", background: "transparent", border: "none", cursor: "pointer" }}
+          >
+            <X size={20} />
+            إغلاق التفاصيل والعودة
+          </button>
+        </div>
         {!activeProduct && (
           <div className="details-empty-state">
             <p className="eyebrow">تفاصيل المنتج</p>
