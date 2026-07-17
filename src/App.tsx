@@ -17,7 +17,11 @@ import {
 } from "lucide-react";
 import "./App.css";
 import AnalyticsDashboard from "./components/AnalyticsDashboard/AnalyticsDashboard";
-
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
 type Category = {
   id: number;
   name: string;
@@ -930,11 +934,17 @@ function App() {
     document.documentElement.dir = "rtl";
     document.documentElement.lang = "ar";
   }, []);
+
   useEffect(() => {
-    const syncHash = () => setHash(window.location.hash || "#catalog");
-    window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+  const syncHash = () => {
+    setHash(window.location.hash || "#catalog");
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "PageView");
+    }
+  };
+  window.addEventListener("hashchange", syncHash);
+  return () => window.removeEventListener("hashchange", syncHash);
+}, []);
 
   // Clear search when navigating away from catalog
   useEffect(() => {
@@ -1311,20 +1321,34 @@ function App() {
     }
   }, [hash, isAdminRoute, loadMyOrders]);
 
-  const mainTab = useMemo<
-    "catalog" | "details" | "checkout" | "orders" | "track"
-  >(() => {
-    const clean = hash.replace("#", "");
-    if (
-      clean === "details" ||
-      clean === "checkout" ||
-      clean === "orders" ||
-      clean === "track"
-    ) {
-      return clean;
-    }
+const mainTab = useMemo<
+  "catalog" | "details" | "checkout" | "orders" | "track" | "notfound"
+>(() => {
+  const clean = hash.replace("#", "");
+  if (
+    clean === "details" ||
+    clean === "checkout" ||
+    clean === "orders" ||
+    clean === "track"
+  ) {
+    return clean;
+  }
+  if (clean === "" || clean === "catalog") {
     return "catalog";
-  }, [hash]);
+  }
+  const knownElsewhere = ["login", "register", "logout", "admin", "analytics"];
+  if (knownElsewhere.includes(clean)) {
+    return "catalog";
+  }
+  return "notfound";
+}, [hash]);
+  useEffect(() => {
+  if (mainTab !== "notfound") return;
+  const timer = window.setTimeout(() => {
+    window.location.hash = "#catalog";
+  }, 4000);
+  return () => window.clearTimeout(timer);
+}, [mainTab]);
 
   const chatContext = useMemo<ChatContext>(() => {
     if (!activeProduct) return { current_page: window.location.pathname };
@@ -3779,6 +3803,21 @@ const addItemToCart = (
         )}
       </section>
       )}
+      {mainTab === "notfound" && (
+  <section className="details-page">
+    <div className="details-empty-state">
+      <p className="eyebrow">خطأ ٤٠٤</p>
+      <h2>الصفحة اللي بتدور عليها مش موجودة</h2>
+      <p className="muted">
+        يمكن الرابط اتغيّر أو مش متاح دلوقتي. هنرجّعك للصفحة الرئيسية
+        تلقائيًا خلال لحظات.
+      </p>
+      <a className="primary-link" href="#catalog">
+        العودة للصفحة الرئيسية
+      </a>
+    </div>
+  </section>
+)}
 
       <button
         className="chat-launcher"
