@@ -3711,3 +3711,51 @@ button {
     display: none !important;
   }
 }
+
+.size-selector {
+  margin-top: 20px;
+}
+.size-selector h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+.size-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.size-option-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 13px;
+  border-radius: 6px;
+  transition: all 180ms ease;
+}
+.size-option-btn:hover {
+  border-color: var(--gold);
+}
+.size-option-btn.active {
+  background: var(--gold);
+  color: #17130f;
+  border-color: var(--gold);
+  font-weight: 700;
+}
+.variant-badge {
+  display: inline-block;
+  margin-top: 2px;
+  margin-inline-start: 8px;
+  padding: 2px 8px;
+  color: var(--gold);
+  background: rgba(211, 177, 108, 0.1);
+  border: 1px solid rgba(211, 177, 108, 0.25);
+  border-radius: 999px;
+  font-size: 11px;
+}
+.detail-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

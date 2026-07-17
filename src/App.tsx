@@ -29,6 +29,7 @@ type Product = {
   id: string;
   title: string;
   slug: string;
+  variants?: ProductVariant[];
   description?: string | null;
   material?: string | null;
   color?: string | null;
@@ -66,12 +67,19 @@ type PaginatedProducts = {
   previous: string | null;
   results: Product[];
 };
+type ProductVariant = {
+  id: string;
+  size_name: string;
+  price: string;
+  is_available?: boolean;
+};
 
 type CartItem = {
   product: Product;
   quantity: number;
   selectedLocation?: string | null;
   shippingPrice?: number;
+  selectedVariant?: ProductVariant | null;
 };
 
 type OrderItemPayload = {
@@ -79,6 +87,7 @@ type OrderItemPayload = {
   quantity: number;
   shipping_price?: number;
   shipping_location?: string;
+  variant_id?: string | null;
 };
 
 type OrderPayload = {
@@ -219,7 +228,14 @@ const getAuthHeaders = (): Record<string, string> => {
   const accessToken = localStorage.getItem("furniture_access_token");
   return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
 };
+const itemUnitPrice = (item: CartItem) =>
+  item.selectedVariant ? Number(item.selectedVariant.price) : Number(item.product.final_price);
 
+const cartItemKey = (product: Product, variant?: ProductVariant | null) =>
+  variant ? `${product.id}::${variant.id}` : product.id;
+
+const pickDefaultVariant = (product?: Product | null): ProductVariant | null =>
+  product?.variants && product.variants.length > 0 ? product.variants[0] : null;
 const getImageUrl = (images: unknown) => {
   if (typeof images === "string" && images.startsWith("http")) return images;
 
@@ -832,6 +848,10 @@ function App() {
   const [depositSentViaWhatsapp, setDepositSentViaWhatsapp] = useState(false);
   const [policyModalOpen, setPolicyModalOpen] = useState(false);
   const [pendingOrderPayload, setPendingOrderPayload] = useState<OrderPayload | null>(null);
+  const [sizeModalOpen, setSizeModalOpen] = useState(false);
+  const [pendingVariant, setPendingVariant] = useState<ProductVariant | null>(null);
+  const [detailSelectedVariant, setDetailSelectedVariant] = useState<ProductVariant | null>(null);
+
 
   const [chatProductCards, setChatProductCards] = useState<
     Record<string, ChatProductCard[]>
@@ -1317,7 +1337,7 @@ function App() {
   }, [activeProduct]);
 
   const subtotal = cart.reduce(
-    (total, item) => total + Number(item.product.final_price) * item.quantity,
+    (total, item) => total + itemUnitPrice(item) * item.quantity,
     0,
   );
 
@@ -1363,91 +1383,107 @@ function App() {
     setDepositProofPreview(file ? URL.createObjectURL(file) : null);
   };
 
-  const openProductDetails = async (product: Product) => {
-    setSavedScrollPos(window.scrollY);
-    setActiveProduct(product);
-    setActiveImageIndex(0);
-    window.history.replaceState(null, "", `/products/${product.slug}#details`);
-    setHash("#details");
-    window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 0);
+const openProductDetails = async (product: Product) => {
+  setSavedScrollPos(window.scrollY);
+  setActiveProduct(product);
+  setActiveImageIndex(0);
+  setDetailSelectedVariant(pickDefaultVariant(product)); 
+  window.history.replaceState(null, "", `/products/${product.slug}#details`);
+  setHash("#details");
+  window.setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, 0);
 
-    try {
-      const trackedProduct = await api.getProduct(product.slug);
-      setActiveProduct(trackedProduct);
-    } catch (error) {
-      setToast({
-        tone: "error",
-        text: `Could not load product details: ${error instanceof Error ? error.message : "Unknown error"}`,
-      });
-    }
-  };
-
-  const closeProductDetails = () => {
-    window.history.pushState(null, "", "/#catalog");
-    setHash("#catalog");
-    setActiveProduct(null);
-    window.setTimeout(() => {
-      window.scrollTo({ top: savedScrollPos, behavior: "instant" });
-    }, 0);
-  };
-
-  const addToCart = (product: Product) => {
-    // Check if product has shipping rates
-    const hasShippingOptions = product.shipping_rates && product.shipping_rates.length > 0;
-    
-    if (hasShippingOptions) {
-      // Open location modal for this product
-      setActiveProduct(product);
-      setLocationModalOpen(true);
-      return;
-    }
-    
-    // No shipping options, add with default shipping
-    const defaultShipping = product.default_shipping_price ? Number(product.default_shipping_price) : 0;
-    
-    setCart((current) => {
-      const existing = current.find((item) => item.product.id === product.id);
-      if (existing) {
-        return current.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        );
-      }
-      return [...current, { product, quantity: 1, selectedLocation: null, shippingPrice: defaultShipping }];
+  try {
+    const trackedProduct = await api.getProduct(product.slug);
+    setActiveProduct(trackedProduct);
+    setDetailSelectedVariant(pickDefaultVariant(trackedProduct));
+  } catch (error) {
+    setToast({
+      tone: "error",
+      text: `Could not load product details: ${error instanceof Error ? error.message : "Unknown error"}`,
     });
-    setCartOpen(true);
-    setToast({ tone: "success", text: `${product.title} added to cart.` });
-  };
+  }
+};
+
+const closeProductDetails = () => {
+  window.history.pushState(null, "", "/#catalog");
+  setHash("#catalog");
+  setActiveProduct(null);
+  setDetailSelectedVariant(null); 
+  window.setTimeout(() => {
+    window.scrollTo({ top: savedScrollPos, behavior: "instant" });
+  }, 0);
+};
+  const addToCart = (product: Product) => {
+  if (product.variants && product.variants.length > 0) {
+    setActiveProduct(product);
+    setSizeModalOpen(true);
+    return;
+  }
+  proceedAddToCart(product, null);
+};
+
+const proceedAddToCart = (product: Product, variant: ProductVariant | null) => {
+  const hasShippingOptions = product.shipping_rates && product.shipping_rates.length > 0;
+  if (hasShippingOptions) {
+    setActiveProduct(product);
+    setPendingVariant(variant);
+    setLocationModalOpen(true);
+    return;
+  }
+  const defaultShipping = product.default_shipping_price ? Number(product.default_shipping_price) : 0;
+  addItemToCart(product, variant, null, defaultShipping);
+};
+
+const selectProductSize = (product: Product, variant: ProductVariant) => {
+  setSizeModalOpen(false);
+  proceedAddToCart(product, variant);
+};
+
+const addItemToCart = (
+  product: Product,
+  variant: ProductVariant | null,
+  location: string | null,
+  shippingPrice: number,
+) => {
+  const key = cartItemKey(product, variant);
+  setCart((current) => {
+    const existing = current.find((item) => cartItemKey(item.product, item.selectedVariant) === key);
+    if (existing) {
+      return current.map((item) =>
+        cartItemKey(item.product, item.selectedVariant) === key
+          ? { ...item, quantity: item.quantity + 1 }
+          : item,
+      );
+    }
+    return [
+      ...current,
+      { product, quantity: 1, selectedVariant: variant, selectedLocation: location, shippingPrice },
+    ];
+  });
+  setCartOpen(true);
+  const sizeLabel = variant ? ` (${variant.size_name})` : "";
+  setToast({ tone: "success", text: `${product.title}${sizeLabel} أضيف للسلة.` });
+};
 
   const selectShippingLocation = (product: Product, location: string, price: number) => {
-    setCart((current) => {
-      const existing = current.find((item) => item.product.id === product.id);
-      if (existing) {
-        return current.map((item) =>
-          item.product.id === product.id
-            ? { ...item, selectedLocation: location, shippingPrice: price }
-            : item,
-        );
-      }
-      return [...current, { product, quantity: 1, selectedLocation: location, shippingPrice: price }];
-    });
-    setLocationModalOpen(false);
-    setCartOpen(true);
-    setToast({ tone: "success", text: `${product.title} added to cart with shipping.` });
-  };
+  addItemToCart(product, pendingVariant, location, price);
+  setPendingVariant(null);
+  setLocationModalOpen(false);
+  setCartOpen(true);
+};
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    setCart((current) =>
-      current
-        .map((item) =>
-          item.product.id === productId ? { ...item, quantity } : item,
-        )
-        .filter((item) => item.quantity > 0),
-    );
-  };
+  const updateQuantity = (product: Product, variant: ProductVariant | null | undefined, quantity: number) => {
+  const key = cartItemKey(product, variant ?? null);
+  setCart((current) =>
+    current
+      .map((item) =>
+        cartItemKey(item.product, item.selectedVariant) === key ? { ...item, quantity } : item,
+      )
+      .filter((item) => item.quantity > 0),
+  );
+};
 
   const openContextChat = async (product?: Product) => {
     const contextProduct = product ?? activeProduct ?? undefined;
@@ -1489,7 +1525,6 @@ function App() {
       if (!activeConversationId) {
         activeConversationId = await api.startChat(activeProduct ?? undefined);
         setConversationId(activeConversationId);
-        // Don't persist conversation_id to prevent sharing between users
       }
 
       if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -1680,8 +1715,9 @@ function App() {
       customer_address: String(form.get("customer_address") ?? ""),
       notes: String(form.get("notes") ?? ""),
       shipping_price: totalShipping,
-      items: cart.map(({ product, quantity, shippingPrice, selectedLocation }) => ({
+      items: cart.map(({ product, quantity, shippingPrice, selectedLocation, selectedVariant }) => ({
         product_id: product.id,
+        variant_id: selectedVariant ? selectedVariant.id : null,
         quantity,
         shipping_price: shippingPrice,
         shipping_location: selectedLocation,
@@ -3487,9 +3523,26 @@ function App() {
                     )}
                   </div>
                 )}
+                {activeProduct.variants && activeProduct.variants.length > 0 && (
+                  <div className="size-selector">
+                    <h4>المقاسات والأسعار المتاحة</h4>
+                    <div className="size-options">
+                      {activeProduct.variants.map((variant) => (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          className={`size-option-btn ${detailSelectedVariant?.id === variant.id ? "active" : ""}`}
+                          onClick={() => setDetailSelectedVariant(variant)}
+                        >
+                          {variant.size_name} — {money(variant.price)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <p className="detail-price">
-                  {money(activeProduct.final_price)}
-                </p>
+  {money(detailSelectedVariant ? detailSelectedVariant.price : activeProduct.final_price)}
+</p>
                 <div className="detail-actions">
                   <button
                     type="button"
@@ -3511,7 +3564,8 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => addToCart(activeProduct)}
+                    disabled={Boolean(activeProduct.variants?.length) && !detailSelectedVariant}
+                    onClick={() => proceedAddToCart(activeProduct, detailSelectedVariant)}
                   >
                     أضف للسلة
                   </button>
@@ -3562,8 +3616,11 @@ function App() {
                 <div className="checkout-cart-item" key={item.product.id}>
                   <div className="checkout-item-details">
                     <div className="checkout-item-header">
-                      <strong>{item.product.title}</strong>
-                      <span className="price">{money(item.product.final_price)}</span>
+                      <strong>
+                        {item.product.title}
+                        {item.selectedVariant && <span className="variant-badge">{item.selectedVariant.size_name}</span>}
+                      </strong>
+                      <span className="price">{money(itemUnitPrice(item))}</span>
                     </div>
                     <div className="checkout-item-specs">
                       <p>الخامة: {item.product.material ?? "غير محدد"}</p>
@@ -3582,7 +3639,7 @@ function App() {
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product.id, Math.max(0, item.quantity - 1))}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, Math.max(0, item.quantity - 1))}
                         aria-label="Decrease quantity"
                       >
                         -
@@ -3591,7 +3648,7 @@ function App() {
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.quantity + 1)}
                         aria-label="Increase quantity"
                       >
                         +
@@ -3751,19 +3808,20 @@ function App() {
                 {cart.map((item) => (
                   <div className="cart-row" key={item.product.id}>
                     <div>
-                      <strong>{item.product.title}</strong>
-                      <span>{money(item.product.final_price)}</span>
-                      {item.selectedLocation && (
-                        <small className="shipping-info">
-                          الشحن إلى: {item.selectedLocation} ({money(item.shippingPrice)})
-                        </small>
-                      )}
-                    </div>
+                    <strong>{item.product.title}</strong>
+                    {item.selectedVariant && <small className="variant-badge">{item.selectedVariant.size_name}</small>}
+                    <span>{money(itemUnitPrice(item))}</span>
+                    {item.selectedLocation && (
+                      <small className="shipping-info">
+                        الشحن إلى: {item.selectedLocation} ({money(item.shippingPrice)})
+                      </small>
+                    )}
+                  </div>
                     <div className="quantity-control">
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product.id, Math.max(0, item.quantity - 1))}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, Math.max(0, item.quantity - 1))}
                         aria-label="Decrease quantity"
                       >
                         -
@@ -3772,7 +3830,7 @@ function App() {
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.quantity + 1)}
                         aria-label="Increase quantity"
                       >
                         +
@@ -3995,6 +4053,38 @@ function App() {
           </div>
         </aside>
       )}
+
+      {sizeModalOpen && activeProduct && (
+  <aside className="modal-panel" aria-label="Select product size">
+    <div className="location-modal">
+      <header>
+        <h2>اختيار المقاس</h2>
+        <button type="button" onClick={() => setSizeModalOpen(false)} aria-label="Close size modal">
+          <X size={20} />
+        </button>
+      </header>
+      <p className="location-product-name">{activeProduct.title}</p>
+      {activeProduct.variants && activeProduct.variants.length > 0 ? (
+        <div className="location-options">
+          {activeProduct.variants.map((variant) => (
+            <button
+              key={variant.id}
+              type="button"
+              className="location-option"
+              onClick={() => selectProductSize(activeProduct, variant)}
+            >
+              <span>{variant.size_name}</span>
+              <span className="location-price">{money(variant.price)}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">لا توجد مقاسات متاحة لهذا المنتج.</p>
+      )}
+    </div>
+  </aside>
+)}
+
 
       {chatOpen && (
         <aside className="chat-panel" aria-label="Customer service chat">
