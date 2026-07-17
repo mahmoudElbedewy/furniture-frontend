@@ -1,3 +1,7 @@
+html,
+body {
+  direction: rtl;
+}
 .site-shell {
   min-height: 100svh;
   background: var(--bg);
@@ -134,6 +138,7 @@
 .nav-actions {
   display: flex;
   gap: 14px;
+    direction: ltr;
 }
 
 .nav-actions button {
@@ -973,8 +978,8 @@ button {
   margin-top: 12px;
   font-size: 15px;
   line-height: 1.6;
+  white-space: pre-wrap;
 }
-
 .detail-copy {
   position: relative;
 }

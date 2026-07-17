@@ -730,22 +730,22 @@ const api = {
     );
     return normalizeMessage(message);
   },
-  async toggleFavorite(productId: string, identityToken: string) {
-    return request<{ message?: string } | { id: string; product: string; customer_identifier: string; created_at: string }>("/api/catalog/favorites/toggle/", {
-      method: "POST",
-      body: JSON.stringify({ product_id: productId, customer_identifier: identityToken }),
-    });
-  },
-  async checkFavorite(productId: string, identityToken: string) {
-    return request<{ is_favorited: boolean }>(
-      `/api/catalog/favorites/check/?product_id=${encodeURIComponent(productId)}&customer_identifier=${encodeURIComponent(identityToken)}`,
-    );
-  },
-  async listFavorites(identityToken: string) {
-    return request<Array<{ id: string; product: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>(
-      `/api/catalog/favorites/?customer_identifier=${encodeURIComponent(identityToken)}`,
-    );
-  },
+async toggleFavorite(productId: string, identityToken: string) {
+  return request<{ message?: string } | { id: string; product: string; customer_identifier: string; created_at: string }>("/api/catalog/favorites/toggle/", {
+    method: "POST",
+    body: JSON.stringify({ product_id: productId, identity_token: identityToken }),
+  });
+},
+async checkFavorite(productId: string, identityToken: string) {
+  return request<{ is_favorited: boolean }>(
+    `/api/catalog/favorites/check/?product_id=${encodeURIComponent(productId)}&identity_token=${encodeURIComponent(identityToken)}`,
+  );
+},
+async listFavorites(identityToken: string) {
+  return request<Array<{ id: string; product: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>(
+    `/api/catalog/favorites/?identity_token=${encodeURIComponent(identityToken)}`,
+  );
+},
   async uploadAgentImages(files: FileList) {
     const form = new FormData();
     Array.from(files).forEach((file) => form.append("images", file));
@@ -905,7 +905,10 @@ function App() {
     hash === "#login" || hash === "#register" || hash === "#logout";
   const hasAuthToken = Boolean(localStorage.getItem("furniture_access_token"));
   const hasAdminToken = hasAuthToken && customerProfile?.role === "admin";
-
+  useEffect(() => {
+    document.documentElement.dir = "rtl";
+    document.documentElement.lang = "ar";
+  }, []);
   useEffect(() => {
     const syncHash = () => setHash(window.location.hash || "#catalog");
     window.addEventListener("hashchange", syncHash);
@@ -3466,20 +3469,6 @@ function App() {
                         : "غير مطلوب"}
                     </dd>
                   </div>
-                  <div>
-                    <dt>الشحن</dt>
-                    <dd>
-                      {activeProduct.ships_nationwide
-                        ? "جميع المحافظات"
-                        : "منطقة المورد"}
-                    </dd>
-                  </div>
-                  {activeProduct.default_shipping_price && (
-                    <div>
-                      <dt>الشحن الافتراضي</dt>
-                      <dd>{money(activeProduct.default_shipping_price)}</dd>
-                    </div>
-                  )}
                 </dl>
                 
                 {activeProduct.shipping_summary && (
@@ -3815,7 +3804,7 @@ function App() {
                     setCartOpen(false);
                   }}
                 >
-                  إتمام الدفع
+                  إتمام الطلب
                 </button>
                 <button
                   type="button"
@@ -3863,10 +3852,10 @@ function App() {
             />
             <textarea
               name="customer_address"
-              placeholder="العنوان بالتفصيل الممل"
+              placeholder="العنوان بالتفصيل "
               required
             />
-            <textarea name="notes" placeholder="ملاحظات" />
+            <textarea name="notes" placeholder="اللون والمقاس المطلوب اذا كان المنتج له اكثر من مقاس" />
             <div className="checkout-summary">
               <div className="summary-row">
                 <span>المجموع الفرعي</span>
