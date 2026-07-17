@@ -386,6 +386,7 @@ const draftRows = [
   ["dimensions", "Dimensions"],
   ["base_price", "Base price"],
   ["commission_value", "Commission"],
+  ["variants", "Sizes/Variants"], 
   ["requires_deposit", "Requires deposit"],
   ["deposit_amount", "Deposit amount"],
   ["ships_nationwide", "Shipping coverage"],
