@@ -4,7 +4,7 @@ import {
   ToggleLeft, ToggleRight, RefreshCw,
   Shield, Mail, User, Save,
 } from 'lucide-react';
-import { fetchAnalyticsSettings, updateAnalyticsSettings, type AnalyticsSettingsData } from './api';
+import { fetchAnalyticsSettings, updateAnalyticsSettings, syncMetaData, type AnalyticsSettingsData } from './api';
 
 export default function SettingsTab() {
   const [data, setData] = useState<AnalyticsSettingsData | null>(null);
@@ -23,6 +23,9 @@ export default function SettingsTab() {
   const [igFollowers, setIgFollowers] = useState(0);
   const [metaConnected, setMetaConnected] = useState(true);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [accessToken, setAccessToken] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAnalyticsSettings()
@@ -36,6 +39,8 @@ export default function SettingsTab() {
         setIgFollowers(d.ig_followers_override);
         setMetaConnected(d.is_meta_connected);
         setGoogleConnected(d.is_google_connected);
+        setAccessToken(d.meta_access_token || '');
+        setLastSync(d.last_meta_sync);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -51,6 +56,7 @@ export default function SettingsTab() {
         fb_page_id: fbPageId,
         fb_followers_override: fbFollowers,
         fb_reach_override: fbReach,
+        meta_access_token: accessToken,
         ig_page_url: igUrl,
         ig_followers_override: igFollowers,
         is_meta_connected: metaConnected,
@@ -62,6 +68,21 @@ export default function SettingsTab() {
       setError(e instanceof Error ? e.message : 'خطأ في الحفظ');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const result = await syncMetaData();
+      setSuccess(result.message);
+      setLastSync(result.data.synced_at);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'خطأ في المزامنة');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -110,13 +131,13 @@ export default function SettingsTab() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-slate-100">Meta Graph API</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Facebook & Instagram</p>
+                <p className="text-xs text-slate-400 mt-0.5">{data?.page_name ? `صفحة: ${data.page_name}` : 'Facebook & Instagram'}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${metaConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-              <span className={`text-xs font-medium ${metaConnected ? 'text-emerald-400' : 'text-red-400'}`}>
-                {metaConnected ? 'متصل' : 'غير متصل'}
+              <span className={`text-xs font-medium ${data?.token_status === 'valid' ? 'text-emerald-400' : metaConnected ? 'text-amber-400' : 'text-red-400'}`}>
+                {data?.token_status === 'valid' ? 'متصل ✓' : metaConnected ? 'توكن غير فعال' : 'غير متصل'}
               </span>
             </div>
           </div>
@@ -144,12 +165,42 @@ export default function SettingsTab() {
                   className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none" />
               </div>
             </div>
+            <div className="mt-3">
+              <label className="text-xs text-slate-400 block mb-1">Access Token (من Graph API Explorer)</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  placeholder="الصق التوكن هنا..."
+                  className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none font-mono"
+                />
+              </div>
+              {accessToken && (
+                <p className="text-xs text-emerald-400/70 mt-1 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 inline-block" />
+                  توكن مُضاف
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/[0.06]">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>يتم جلب المتابعين تلقائياً من فيسبوك</span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSync}
+                disabled={syncing || !accessToken}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-xs font-medium text-indigo-400 transition-all hover:bg-indigo-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'جاري المزامنة...' : 'مزامنة الآن'}
+              </button>
+              {lastSync && (
+                <span className="text-xs text-slate-500">
+                  آخر مزامنة: {new Date(lastSync).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
             <button type="button" onClick={() => setMetaConnected(!metaConnected)} className="focus:outline-none">
               {metaConnected

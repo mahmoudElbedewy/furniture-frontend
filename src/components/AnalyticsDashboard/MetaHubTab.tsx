@@ -64,6 +64,23 @@ export default function MetaHubTab() {
   return (
     <section className="space-y-8">
       <h2 className="text-lg font-semibold text-slate-100">مركز ميتا</h2>
+      {data.meta_error && (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 backdrop-blur-md space-y-3">
+          <div className="flex items-center gap-2 text-red-400 font-semibold text-sm">
+            <span>⚠️</span>
+            <span>سبب عدم مزامنة فيسبوك: رمز الوصول (Access Token) انتهت صلاحيته</span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            التوكن المؤقت من فيسبوك مدته 60 دقيقة فقط وتوقف عند الساعة (06:00 PDT). لتفعيل المزامنة واجتلاب الـ 20 متابع والمنشورات الحقيقية مجدداً:
+          </p>
+          <ol className="text-xs text-slate-400 list-decimal list-inside space-y-1.5 pt-1">
+            <li>افتح <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-indigo-400 underline font-medium hover:text-indigo-300">Graph API Explorer</a> في متصفحك.</li>
+            <li>اختر التطبيق <strong className="text-slate-200">furniture</strong> والتطبيقات المرتبطة بصفحتك <strong className="text-slate-200">Home Style</strong>.</li>
+            <li>اضغط <strong className="text-slate-200">Generate Access Token</strong> وقص التوكن الجديد.</li>
+            <li>اذهب لتبويب <strong className="text-slate-200">الإعدادات والتكامل</strong> والطق التوكن في حقل Access Token واضغط <strong className="text-slate-200">مزامنة الآن</strong>.</li>
+          </ol>
+        </div>
+      )}
 
       {/* Two-column layout */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -73,7 +90,7 @@ export default function MetaHubTab() {
             <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(24,119,242,0.15)' }}>
               <span className="text-xs font-bold" style={{ color: '#1877F2' }}>f</span>
             </div>
-            <h3 className="text-base font-semibold text-slate-100">فيسبوك</h3>
+            <h3 className="text-base font-semibold text-slate-100">{fb.pageName || 'فيسبوك'}</h3>
             <span className={`mr-auto text-xs font-medium px-2 py-0.5 rounded-full ${fb.followers > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               {fb.followers > 0 ? 'متصل' : 'غير متصل'}
             </span>

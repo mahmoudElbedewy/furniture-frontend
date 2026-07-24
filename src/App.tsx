@@ -808,6 +808,16 @@ async listFavorites(identityToken: string) {
     return safeJson(response) as Promise<ProductDraftResponse>;
   },
 };
+// Track page visits
+const trackVisit = (path: string) => {
+  try {
+    fetch('/api/track-visit/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, referrer: document.referrer }),
+    }).catch(() => {}); // silent fail
+  } catch {} // silent fail
+};
 
 function App() {
   const [hash, setHash] = useState(window.location.hash || "#catalog");
@@ -941,7 +951,9 @@ function App() {
     if (typeof window.fbq === "function") {
       window.fbq("track", "PageView");
     }
+    trackVisit(window.location.hash || '#catalog');
   };
+  trackVisit(window.location.hash || '#catalog');
   window.addEventListener("hashchange", syncHash);
   return () => window.removeEventListener("hashchange", syncHash);
 }, []);

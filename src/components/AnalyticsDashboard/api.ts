@@ -100,6 +100,7 @@ export type FacebookData = {
   adSpend: number;
   adClicks: number;
   weeklyFollowers: WeeklyFollowers[];
+  pageName: string;
 };
 
 export type InstagramData = {
@@ -127,6 +128,7 @@ export type MetaHubData = {
   facebook: FacebookData;
   instagram: InstagramData;
   topPosts: TopPost[];
+  meta_error?: string;
 };
 
 export type AnalyticsSettingsData = {
@@ -134,10 +136,14 @@ export type AnalyticsSettingsData = {
   fb_page_id: string;
   fb_followers_override: number;
   fb_reach_override: number;
+  meta_access_token: string;
   ig_page_url: string;
   ig_followers_override: number;
   is_meta_connected: boolean;
   is_google_connected: boolean;
+  last_meta_sync: string | null;
+  token_status: 'valid' | 'invalid_or_expired' | 'no_token';
+  page_name: string;
   admin_name: string;
   admin_email: string;
 };
@@ -150,3 +156,5 @@ export const fetchMetaHub = () => apiFetch<MetaHubData>("analytics/meta/");
 export const fetchAnalyticsSettings = () => apiFetch<AnalyticsSettingsData>("analytics/settings/");
 export const updateAnalyticsSettings = (data: Record<string, unknown>) =>
   apiPost<{ message: string }>("analytics/settings/update/", data);
+export const syncMetaData = () =>
+  apiPost<{ message: string; data: { followers: number; reach: number; posts_synced: number; ad_spend: number; ad_clicks: number; synced_at: string } }>('analytics/sync/', {});
