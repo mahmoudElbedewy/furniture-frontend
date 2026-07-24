@@ -14,7 +14,7 @@ export default function SettingsTab() {
   const [success, setSuccess] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(true);
 
-  // Editable fields
+  // Meta Editable fields
   const [fbUrl, setFbUrl] = useState('');
   const [fbPageId, setFbPageId] = useState('');
   const [fbFollowers, setFbFollowers] = useState(0);
@@ -22,25 +22,33 @@ export default function SettingsTab() {
   const [igUrl, setIgUrl] = useState('');
   const [igFollowers, setIgFollowers] = useState(0);
   const [metaConnected, setMetaConnected] = useState(true);
-  const [googleConnected, setGoogleConnected] = useState(false);
   const [accessToken, setAccessToken] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
+  // GA4 Editable fields (الجديدة)
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [ga4PropertyId, setGa4PropertyId] = useState('');
+  const [ga4ServiceAccountJson, setGa4ServiceAccountJson] = useState('');
+
   useEffect(() => {
     fetchAnalyticsSettings()
-      .then((d) => {
+      .then((d: any) => {
         setData(d);
-        setFbUrl(d.fb_page_url);
-        setFbPageId(d.fb_page_id);
-        setFbFollowers(d.fb_followers_override);
-        setFbReach(d.fb_reach_override);
-        setIgUrl(d.ig_page_url);
-        setIgFollowers(d.ig_followers_override);
-        setMetaConnected(d.is_meta_connected);
-        setGoogleConnected(d.is_google_connected);
+        setFbUrl(d.fb_page_url || '');
+        setFbPageId(d.fb_page_id || '');
+        setFbFollowers(d.fb_followers_override || 0);
+        setFbReach(d.fb_reach_override || 0);
+        setIgUrl(d.ig_page_url || '');
+        setIgFollowers(d.ig_followers_override || 0);
+        setMetaConnected(d.is_meta_connected ?? true);
+        setGoogleConnected(d.is_google_connected ?? false);
         setAccessToken(d.meta_access_token || '');
-        setLastSync(d.last_meta_sync);
+        setLastSync(d.last_meta_sync || null);
+
+        // تحميل بيانات GA4
+        setGa4PropertyId(d.ga4_property_id || '');
+        setGa4ServiceAccountJson(d.ga4_service_account_json || '');
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -61,7 +69,10 @@ export default function SettingsTab() {
         ig_followers_override: igFollowers,
         is_meta_connected: metaConnected,
         is_google_connected: googleConnected,
-      });
+        // إرسال بيانات GA4 للحفظ
+        ga4_property_id: ga4PropertyId,
+        ga4_service_account_json: ga4ServiceAccountJson,
+      } as any);
       setSuccess('تم تحديث الإعدادات بنجاح ✅');
       setTimeout(() => setSuccess(null), 3000);
     } catch (e: unknown) {
@@ -210,7 +221,7 @@ export default function SettingsTab() {
           </div>
         </div>
 
-        {/* Google Analytics */}
+        {/* Google Analytics 4 (GA4) */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-md">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -218,8 +229,8 @@ export default function SettingsTab() {
                 {googleConnected ? <Link2 className="w-5 h-5 text-indigo-400" /> : <Unlink className="w-5 h-5 text-red-400" />}
               </div>
               <div>
-                <h3 className="text-base font-semibold text-slate-100">Google Analytics / Pixel</h3>
-                <p className="text-xs text-slate-400 mt-0.5">تتبع الويب والتحويلات</p>
+                <h3 className="text-base font-semibold text-slate-100">Google Analytics 4</h3>
+                <p className="text-xs text-slate-400 mt-0.5">تتبع الزيارات والتحويلات</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -230,9 +241,29 @@ export default function SettingsTab() {
             </div>
           </div>
 
-          <p className="text-sm text-slate-400 mb-4 leading-relaxed">
-            يمكنك تتبع زيارات الموقع ومعدل الارتداد ومدة الجلسة ومعدل التحويل من خلال Google Analytics 4.
-          </p>
+          {/* حقول GA4 الجديدة */}
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">GA4 Property ID</label>
+              <input
+                type="text"
+                value={ga4PropertyId}
+                onChange={(e) => setGa4PropertyId(e.target.value)}
+                placeholder="مثال: 123456789"
+                className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1">GA4 Service Account JSON</label>
+              <textarea
+                value={ga4ServiceAccountJson}
+                onChange={(e) => setGa4ServiceAccountJson(e.target.value)}
+                rows={5}
+                placeholder='الصق محتوى ملف الـ JSON هنا...'
+                className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-xs font-mono text-slate-200 focus:border-indigo-500 focus:outline-none resize-none"
+              />
+            </div>
+          </div>
 
           {/* Instagram fields */}
           <div className="space-y-3 border-t border-white/[0.06] pt-4 mt-4">
@@ -250,10 +281,7 @@ export default function SettingsTab() {
           </div>
 
           <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/[0.06]">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>آخر مزامنة: —</span>
-            </div>
+            <span className="text-xs text-slate-400">تفعيل/إيقاف ربط جوجل</span>
             <button type="button" onClick={() => setGoogleConnected(!googleConnected)} className="focus:outline-none">
               {googleConnected
                 ? <ToggleRight className="w-10 h-10 text-indigo-400" />

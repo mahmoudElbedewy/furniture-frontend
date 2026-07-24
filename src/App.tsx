@@ -2170,7 +2170,51 @@ const addItemToCart = (
     );
   }
 
-  if (isAnalyticsRoute && hasAdminToken) {
+  if (isAnalyticsRoute) {
+    if (!hasAdminToken) {
+      return (
+        <main className="site-shell admin-shell">
+          <header className="nav-bar">
+            <a className="brand" href="#catalog">
+              Home Style
+            </a>
+            <nav aria-label="Admin navigation">
+              <a href="#catalog">المتجر</a>
+              <a href="#admin">لوحة الإدارة</a>
+            </nav>
+          </header>
+          <section className="auth-section">
+            <form className="admin-card login-card" onSubmit={submitAdminLogin}>
+              <h2>تسجيل دخول الإدارة لرؤية التحليلات</h2>
+              <p className="muted">يرجى إدخال بيانات حساب المسؤول لعرض لوحة التحليلات.</p>
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={(event) => setAdminEmail(event.target.value)}
+                placeholder="البريد الإلكتروني للإدارة"
+                required
+              />
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                placeholder="كلمة المرور"
+                required
+              />
+              <button
+                type="submit"
+                className="panel-primary"
+                disabled={adminLoading}
+              >
+                {adminLoading ? "جاري تسجيل الدخول..." : "دخول"}
+              </button>
+              {adminError && <p className="inline-error">{adminError}</p>}
+            </form>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <AnalyticsDashboard onBack={() => { window.location.hash = '#catalog'; setHash('#catalog'); }} />
     );

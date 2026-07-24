@@ -1,160 +1,92 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, Globe, Share2, Settings, ChevronLeft,
-  ChevronRight, Home, Menu, X, CalendarDays,
+  LayoutDashboard, Users, Newspaper, Globe, Settings, ChevronLeft,
+  ChevronRight, Home, Menu, X,
 } from 'lucide-react';
 import './AnalyticsDashboard.css';
+import DateRangePicker from './DateRangePicker';
+import { useDateRange } from './useDateRange';
 import OverviewTab from './OverviewTab';
-import WebAnalyticsTab from './WebAnalyticsTab';
 import MetaHubTab from './MetaHubTab';
+import ContentTab from './ContentTab';
+import WebAnalyticsTab from './WebAnalyticsTab';
 import SettingsTab from './SettingsTab';
 
-type TabKey = 'overview' | 'web' | 'meta' | 'settings';
+type TabKey = 'overview' | 'metahub' | 'content' | 'web' | 'settings';
 
 const navItems: { key: TabKey; label: string; icon: typeof LayoutDashboard }[] = [
-  { key: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
-  { key: 'web', label: 'تحليلات الويب', icon: Globe },
-  { key: 'meta', label: 'مركز ميتا', icon: Share2 },
-  { key: 'settings', label: 'الإعدادات', icon: Settings },
+  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'metahub', label: 'Meta Hub', icon: Users },
+  { key: 'content', label: 'Content', icon: Newspaper },
+  { key: 'web', label: 'Web Analytics', icon: Globe },
+  { key: 'settings', label: 'Settings', icon: Settings },
 ];
-
-const tabTitles: Record<TabKey, string> = {
-  overview: 'نظرة عامة',
-  web: 'تحليلات الويب',
-  meta: 'مركز ميتا',
-  settings: 'الإعدادات والتكامل',
-};
 
 export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dateRange, setDateRange] = useDateRange();
 
-  const handleNav = (key: TabKey) => {
-    setActiveTab(key);
-    setMobileOpen(false);
-  };
-
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      window.location.hash = '#catalog';
-    }
-  };
+  const handleBack = () => (onBack ? onBack() : (window.location.hash = '#catalog'));
 
   return (
-    <div className="analytics-dashboard" dir="rtl">
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setMobileOpen(false)}
-          onKeyDown={(e) => e.key === 'Escape' && setMobileOpen(false)}
-          role="presentation"
-        />
-      )}
+    <div className="analytics-dashboard" dir="ltr">
+      {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} role="presentation" />}
 
-      {/* Sidebar */}
       <aside className={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-mobile-open' : ''}`}>
-        {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-logo">
             <span className="sidebar-logo-icon">HS</span>
-            {!sidebarCollapsed && <span className="sidebar-logo-text">Home Style</span>}
+            {!sidebarCollapsed && <span className="sidebar-logo-text">Analytics</span>}
           </div>
-          <button
-            type="button"
-            className="sidebar-toggle"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            aria-label="Toggle sidebar"
-          >
-            {sidebarCollapsed ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          <button type="button" className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
-
-        {/* Nav */}
         <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
-                onClick={() => handleNav(item.key)}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <Icon size={20} />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </button>
-            );
-          })}
+          {navItems.map(({ key, label, icon: Icon }) => (
+            <button key={key} type="button"
+              className={`nav-item ${activeTab === key ? 'nav-item-active' : ''}`}
+              onClick={() => { setActiveTab(key); setMobileOpen(false); }}
+              title={sidebarCollapsed ? label : undefined}>
+              <Icon size={20} />
+              {!sidebarCollapsed && <span>{label}</span>}
+            </button>
+          ))}
         </nav>
-
-        {/* Bottom */}
         <div className="sidebar-bottom">
-          <button type="button" className="nav-item" onClick={handleBack} title={sidebarCollapsed ? 'العودة للمتجر' : undefined}>
+          <button type="button" className="nav-item" onClick={handleBack}>
             <Home size={20} />
-            {!sidebarCollapsed && <span>العودة للمتجر</span>}
+            {!sidebarCollapsed && <span>Back to store</span>}
           </button>
-
-          {!sidebarCollapsed && (
-            <div className="sidebar-user">
-              <div className="sidebar-avatar">A</div>
-              <div className="sidebar-user-info">
-                <span className="sidebar-user-name">المسؤول</span>
-                <span className="sidebar-user-role">admin</span>
-              </div>
-            </div>
-          )}
-          {sidebarCollapsed && (
-            <div className="sidebar-user" style={{ justifyContent: 'center' }}>
-              <div className="sidebar-avatar">A</div>
-            </div>
-          )}
         </div>
       </aside>
 
-      {/* Main content */}
       <main className={`dashboard-main ${sidebarCollapsed ? 'dashboard-main-expanded' : ''}`}>
-        {/* Top bar */}
         <header className="dashboard-topbar">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="dash-mobile-menu-btn"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
-            >
+            <button type="button" className="dash-mobile-menu-btn" onClick={() => setMobileOpen(true)}>
               <Menu size={22} />
             </button>
-            <h1 className="text-lg font-bold text-slate-100">{tabTitles[activeTab]}</h1>
+            <h1 className="text-lg font-bold text-slate-100">
+              {navItems.find((n) => n.key === activeTab)?.label}
+            </h1>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <CalendarDays size={14} />
-            <span>يناير ٢٠٢٦ – يوليو ٢٠٢٦</span>
-          </div>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
         </header>
 
-        {/* Tab Content */}
         <div className="dashboard-content">
-          {activeTab === 'overview' && <OverviewTab />}
+          {activeTab === 'overview' && <OverviewTab dateRange={dateRange} />}
+          {activeTab === 'metahub' && <MetaHubTab />}
+          {activeTab === 'content' && <ContentTab dateRange={dateRange} />}
           {activeTab === 'web' && <WebAnalyticsTab />}
-          {activeTab === 'meta' && <MetaHubTab />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </main>
 
-      {/* Mobile close button for sidebar */}
       {mobileOpen && (
-        <button
-          type="button"
-          className="sidebar-close-mobile"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Close menu"
-        >
+        <button type="button" className="sidebar-close-mobile" onClick={() => setMobileOpen(false)}>
           <X size={24} />
         </button>
       )}
