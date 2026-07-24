@@ -85,11 +85,17 @@ export default function SettingsTab() {
   const handleSync = async () => {
     setSyncing(true);
     setError(null);
+    setSuccess(null);
     try {
-      const result = await syncMetaData();
-      setSuccess(result.message);
-      setLastSync(result.data.synced_at);
-      setTimeout(() => setSuccess(null), 3000);
+      const result: any = await syncMetaData();
+      if (result.ok === false || result.error) {
+        setError(result.error || result.message || 'فشلت المزامنة: يرجى التأكد من التوكن والإعدادات.');
+      } else {
+        setSuccess(result.message || 'تمت المزامنة بنجاح ✅');
+        const syncTime = result.data?.synced_at || new Date().toISOString();
+        setLastSync(syncTime);
+        setTimeout(() => setSuccess(null), 4000);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'خطأ في المزامنة');
     } finally {

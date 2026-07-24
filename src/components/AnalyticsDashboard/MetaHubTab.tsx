@@ -3,7 +3,7 @@ import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import { Users, Eye, TrendingUp, ThumbsUp, MessageSquare, Share2 } from 'lucide-react';
 import { fetchMetaHub, type MetaHubData, type TopPost } from './api';
 
-const formatNum = (n: number) => n.toLocaleString('en-US');
+const formatNum = (n: number | null | undefined) => typeof n === 'number' ? n.toLocaleString('en-US') : '0';
 
 /* ── Platform sparkline ──────────────────────────────── */
 function MiniChart({ data, color }: { data: { week: string; count: number }[]; color: string }) {
@@ -60,6 +60,29 @@ export default function MetaHubTab() {
   if (!data) return null;
 
   const { facebook: fb, instagram: ig, topPosts } = data;
+  const hasAnyRealData = (fb.followers !== null && fb.followers !== undefined && fb.followers > 0) || (topPosts && topPosts.length > 0);
+
+  if (!hasAnyRealData && !data.meta_error) {
+    return (
+      <section className="space-y-6">
+        <h2 className="text-lg font-semibold text-slate-100">مركز ميتا</h2>
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-8 backdrop-blur-md text-center space-y-4">
+          <div className="mx-auto h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center">
+            <span className="text-3xl">🔗</span>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-100">لم يتم ربط حساب ميتا بعد</h3>
+          <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            هذا التبويب يعرض بيانات صفحة فيسبوك وإنستجرام الحقيقية بعد الربط والمزامنة.
+          </p>
+          <ol className="text-sm text-slate-400 list-decimal list-inside space-y-1.5 max-w-md mx-auto text-right">
+            <li>اذهب لتبويب <strong className="text-slate-200">الإعدادات</strong></li>
+            <li>أدخل <strong className="text-slate-200">Access Token</strong> صالح و <strong className="text-slate-200">Page ID</strong></li>
+            <li>اضغط <strong className="text-slate-200">مزامنة الآن</strong></li>
+          </ol>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-8">

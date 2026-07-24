@@ -10,7 +10,16 @@ const getAuthHeaders = (): Record<string, string> => {
 async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
   const query = params ? `?${new URLSearchParams(params).toString()}` : "";
   const res = await fetch(`${API_BASE_URL}/api/admin/${path}${query}`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    try {
+      const errData = await res.json();
+      const msg = errData.error || errData.message || errData.detail;
+      if (msg) throw new Error(msg);
+    } catch (e: any) {
+      if (e.message && !e.message.startsWith("API error ")) throw e;
+    }
+    throw new Error(`API error ${res.status}`);
+  }
   return res.json();
 }
 
@@ -18,7 +27,16 @@ async function apiPost<T>(path: string, body: Record<string, unknown> = {}): Pro
   const res = await fetch(`${API_BASE_URL}/api/admin/${path}`, {
     method: "POST", headers: getAuthHeaders(), body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    try {
+      const errData = await res.json();
+      const msg = errData.error || errData.message || errData.detail;
+      if (msg) throw new Error(msg);
+    } catch (e: any) {
+      if (e.message && !e.message.startsWith("API error ")) throw e;
+    }
+    throw new Error(`API error ${res.status}`);
+  }
   return res.json();
 }
 

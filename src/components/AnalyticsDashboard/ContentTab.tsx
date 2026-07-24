@@ -19,6 +19,35 @@ export default function ContentTab({ dateRange }: { dateRange: DateRangeState })
   if (error) return <p className="py-12 text-center text-red-400">Error: {error}</p>;
   if (!data) return null;
 
+  if (!data.posts || data.posts.length === 0) {
+    return (
+      <section className="space-y-6">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-8 backdrop-blur-md text-center space-y-4">
+          <div className="mx-auto h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center">
+            <span className="text-3xl">📭</span>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-100">لا توجد منشورات متزامنة</h3>
+          <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            هذا التبويب يعرض بيانات المنشورات الحقيقية من صفحة فيسبوك بعد المزامنة.
+            لعرض البيانات يجب:
+          </p>
+          <ol className="text-sm text-slate-400 list-decimal list-inside space-y-1.5 max-w-md mx-auto text-right">
+            <li>التأكد من إدخال <strong className="text-slate-200">Access Token</strong> صالح في الإعدادات</li>
+            <li>التأكد من إدخال <strong className="text-slate-200">Page ID</strong> الصحيح</li>
+            <li>الضغط على <strong className="text-slate-200">مزامنة الآن</strong> في صفحة الإعدادات</li>
+          </ol>
+          {data.missingData && data.missingData.length > 0 && (
+            <div className="mt-4 rounded-lg bg-white/[0.04] border border-white/[0.08] p-3">
+              {data.missingData.map((m: { key: string; label: string; reason: string }) => (
+                <p key={m.key} className="text-xs text-slate-500">{m.reason}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-8">
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md">

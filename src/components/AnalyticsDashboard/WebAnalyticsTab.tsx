@@ -87,13 +87,8 @@ export default function WebAnalyticsTab() {
     views: p.views,
   }));
 
-  // Traffic sources from overview (hardcoded colors for pie)
-  const trafficSources = [
-    { name: 'Organic', nameAr: 'بحث عضوي', value: Math.round(metrics.totalSessions * 0.38), color: '#6366f1' },
-    { name: 'Social', nameAr: 'وسائل التواصل', value: Math.round(metrics.totalSessions * 0.28), color: '#f472b6' },
-    { name: 'Direct', nameAr: 'مباشر', value: Math.round(metrics.totalSessions * 0.20), color: '#34d399' },
-    { name: 'Referral', nameAr: 'إحالات', value: Math.round(metrics.totalSessions * 0.14), color: '#fb923c' },
-  ];
+  // Traffic sources - use real data from API if available
+  const trafficSources = (data as any).trafficSources || [];
 
   return (
     <section className="space-y-8">
@@ -101,9 +96,9 @@ export default function WebAnalyticsTab() {
 
       {/* Metric cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard icon={MousePointerClick} label="معدل الارتداد" value={`${metrics.bounceRate}%`} trend={metrics.bounceRateTrend} sparkData={bounceRateSparkline} sparkColor="#f87171" />
-        <MetricCard icon={Clock} label="متوسط مدة الجلسة" value={metrics.avgSessionDuration} trend={metrics.avgSessionDurationTrend} sparkData={sessionDurationSparkline} sparkColor="#6366f1" />
-        <MetricCard icon={Globe} label="إجمالي الجلسات" value={metrics.totalSessions} trend={metrics.totalSessionsTrend} sparkData={totalSessionsSparkline} sparkColor="#34d399" />
+        <MetricCard icon={MousePointerClick} label="معدل الارتداد" value={metrics.bounceRate != null ? `${metrics.bounceRate}%` : 'غير متاح'} trend={metrics.bounceRateTrend ?? 0} sparkData={bounceRateSparkline} sparkColor="#f87171" />
+        <MetricCard icon={Clock} label="متوسط مدة الجلسة" value={metrics.avgSessionDuration ?? 'غير متاح'} trend={metrics.avgSessionDurationTrend ?? 0} sparkData={sessionDurationSparkline} sparkColor="#6366f1" />
+        <MetricCard icon={Globe} label="إجمالي الجلسات" value={metrics.totalSessions ?? 0} trend={metrics.totalSessionsTrend ?? 0} sparkData={totalSessionsSparkline} sparkColor="#34d399" />
       </div>
 
       {/* Charts row */}
@@ -111,28 +106,38 @@ export default function WebAnalyticsTab() {
         {/* Donut */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md">
           <h3 className="mb-4 text-sm font-medium text-slate-300">مصادر الزيارات</h3>
-          <div className="relative mx-auto h-64 w-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={trafficSources} dataKey="value" nameKey="nameAr" cx="50%" cy="50%" innerRadius={62} outerRadius={95} paddingAngle={3} strokeWidth={0}>
-                  {trafficSources.map((s) => <Cell key={s.name} fill={s.color} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-xs text-slate-400">الإجمالي</span>
-              <span className="text-xl font-bold text-white">{metrics.totalSessions.toLocaleString()}</span>
+          {trafficSources.length > 0 ? (
+            <>
+              <div className="relative mx-auto h-64 w-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={trafficSources} dataKey="value" nameKey="nameAr" cx="50%" cy="50%" innerRadius={62} outerRadius={95} paddingAngle={3} strokeWidth={0}>
+                      {trafficSources.map((s: any) => <Cell key={s.name} fill={s.color} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xs text-slate-400">الإجمالي</span>
+                  <span className="text-xl font-bold text-white">{metrics.totalSessions.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2">
+                {trafficSources.map((s: any) => (
+                  <span key={s.name} className="flex items-center gap-1.5 text-xs text-slate-300">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
+                    {s.nameAr} ({s.value.toLocaleString()})
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <span className="text-2xl mb-2">📊</span>
+              <p className="text-sm text-slate-400">لا توجد بيانات مصادر زيارات حقيقية بعد</p>
+              <p className="text-xs text-slate-500 mt-1">اربط GA4 أو انتظر تراكم الزيارات الداخلية</p>
             </div>
-          </div>
-          <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2">
-            {trafficSources.map((s) => (
-              <span key={s.name} className="flex items-center gap-1.5 text-xs text-slate-300">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                {s.nameAr} ({s.value.toLocaleString()})
-              </span>
-            ))}
-          </div>
+          )}
         </div>
 
         {/* Bar chart */}
