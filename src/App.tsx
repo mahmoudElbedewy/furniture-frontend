@@ -5,14 +5,21 @@ import {
   Heart,
   ImageUp,
   Loader2,
+  Lock,
+  LogIn,
+  LogOut,
+  Mail,
   Menu,
   MessageCircle,
   PackageSearch,
+  Phone,
   Power,
   Search,
   Send,
   Settings,
+  Share2,
   ShoppingBag,
+  User,
   X,
 } from "lucide-react";
 import "./App.css";
@@ -822,6 +829,9 @@ const trackVisit = (path: string) => {
 function App() {
   const [hash, setHash] = useState(window.location.hash || "#catalog");
   const [products, setProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    productsRef.current = products;
+  }, [products]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -922,6 +932,7 @@ function App() {
   const [favoriteClicks, setFavoriteClicks] = useState<Record<string, number>>({});
   const [favoritesDropdownOpen, setFavoritesDropdownOpen] = useState(false);
   const [favoriteProducts, setFavoriteProducts] = useState<Array<{ id: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>([]);
+  const [favoriteProductDetails, setFavoriteProductDetails] = useState<Record<string, Product>>({});
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [adminAgentMessages, setAdminAgentMessages] = useState<ChatMessage[]>([
     {
@@ -932,6 +943,8 @@ function App() {
     },
   ]);
   const socketRef = useRef<WebSocket | null>(null);
+  const productsRef = useRef<Product[]>([]);
+  const favoriteDetailsFetchedRef = useRef<Set<string>>(new Set());
 
   const isAnalyticsRoute = hash === "#analytics";
   const isAdminRoute =
@@ -1092,8 +1105,9 @@ function App() {
   }, [customerProfile]);
 
   const loadFavorites = useCallback(async () => {
-    const customerIdentifier = await getCustomerIdentifier();
-    if (!customerIdentifier) return;
+    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+    const customerIdentifier = isAuthenticated ? "" : await getCustomerIdentifier();
+    if (!isAuthenticated && !customerIdentifier) return;
 
     try {
       setFavoritesLoading(true);
@@ -1101,6 +1115,30 @@ function App() {
       const favoriteIds = new Set(favoritesData.map((f) => f.product));
       setFavorites(favoriteIds);
       setFavoriteProducts(favoritesData);
+
+      // The favorites endpoint doesn't return an image, and the favorited
+      // product might not be in the currently loaded/filtered products page.
+      // Fetch full product data for those so the favorites list always has
+      // an image, regardless of which category/page/filter is active.
+      const missing = favoritesData.filter(
+        (fav) =>
+          !productsRef.current.some((p) => p.id === fav.product) &&
+          !favoriteDetailsFetchedRef.current.has(fav.product),
+      );
+      if (missing.length > 0) {
+        missing.forEach((fav) => favoriteDetailsFetchedRef.current.add(fav.product));
+        Promise.all(
+          missing.map((fav) => api.getProduct(fav.product_slug).catch(() => null)),
+        ).then((results) => {
+          setFavoriteProductDetails((prev) => {
+            const next = { ...prev };
+            results.forEach((product, idx) => {
+              if (product) next[missing[idx].product] = product;
+            });
+            return next;
+          });
+        });
+      }
     } catch (error) {
       console.error("Failed to load favorites:", error);
     } finally {
@@ -1109,8 +1147,9 @@ function App() {
   }, [getCustomerIdentifier]);
 
   const toggleFavorite = useCallback(async (productId: string) => {
-    const customerIdentifier = await getCustomerIdentifier();
-    if (!customerIdentifier) return;
+    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+    const customerIdentifier = isAuthenticated ? "" : await getCustomerIdentifier();
+    if (!isAuthenticated && !customerIdentifier) return;
 
     const lastClick = favoriteClicks[productId] || 0;
     const now = Date.now();
@@ -1373,13 +1412,68 @@ const mainTab = useMemo<
     };
   }, [activeProduct]);
 
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (!activeProduct) {
+      setRelatedProducts([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRelatedProducts = async () => {
+      const localFallback = () =>
+        products
+          .filter(
+            (item) =>
+              item.id !== activeProduct.id &&
+              item.category_name === activeProduct.category_name,
+          )
+
+      try {
+        const categorySlug = categories.find(
+          (category) => category.name === activeProduct.category_name,
+        )?.slug;
+
+        const params = new URLSearchParams({ page: "1" });
+        if (categorySlug) {
+          params.set("category", categorySlug);
+        } else {
+          params.set("search", activeProduct.category_name);
+        }
+
+        const payload = await api.listProducts(params);
+        const list = Array.isArray(payload) ? payload : payload.results;
+        const filtered = list
+          .filter(
+            (item) =>
+              item.id !== activeProduct.id &&
+              item.category_name === activeProduct.category_name,
+          )
+
+        if (!cancelled) {
+          setRelatedProducts(filtered.length > 0 ? filtered : localFallback());
+        }
+      } catch {
+        if (!cancelled) setRelatedProducts(localFallback());
+      }
+    };
+
+    loadRelatedProducts();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProduct, categories]);
+
   const subtotal = cart.reduce(
     (total, item) => total + itemUnitPrice(item) * item.quantity,
     0,
   );
 
   const totalShipping = cart.reduce(
-    (total, item) => total + (item.shippingPrice || 0),
+    (total, item) => total + (item.shippingPrice || 0) * item.quantity,
     0,
   );
 
@@ -1743,7 +1837,7 @@ const addItemToCart = (
     }
 
     const form = new FormData(event.currentTarget);
-    const totalShipping = cart.reduce((total, item) => total + (item.shippingPrice || 0), 0);
+    const totalShipping = cart.reduce((total, item) => total + (item.shippingPrice || 0) * item.quantity, 0);
 
     const payload: OrderPayload = {
       customer_name: String(form.get("customer_name") ?? ""),
@@ -2076,7 +2170,8 @@ const addItemToCart = (
         <main className="site-shell">
           <header className="nav-bar">
             <a className="brand" href="#catalog">
-              Home Style            </a>
+              <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
+            </a>
           </header>
           <section className="auth-section">
             <div className="admin-card login-card">
@@ -2103,7 +2198,8 @@ const addItemToCart = (
       <main className="site-shell">
         <header className="nav-bar">
           <a className="brand" href="#catalog">
-            Home Style          </a>
+            <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
+          </a>
           <nav aria-label="Auth navigation">
             <a href="#catalog">Catalog</a>
             <a href="#login">Login</a>
@@ -2111,60 +2207,132 @@ const addItemToCart = (
           </nav>
         </header>
         <section className="auth-section">
-          <form
-            className="admin-card login-card"
-            onSubmit={isRegister ? submitCustomerRegister : submitCustomerLogin}
-          >
-            <p className="eyebrow">
-              {isRegister ? "إنشاء حساب" : "تسجيل دخول العميل"}
+          <div className="auth-blob auth-blob-1" />
+          <div className="auth-blob auth-blob-2" />
+          <div className="auth-card">
+            <div className="auth-icon-badge">
+              <img src="/favicon.svg" alt="Home Style" />
+            </div>
+            <h2 className="auth-title">
+              {isRegister ? "إنشاء حساب جديد" : "أهلاً بيك تاني"}
+            </h2>
+            <p className="auth-subtitle">
+              {isRegister
+                ? "سجّل بياناتك عشان تبدأ التسوق معانا"
+                : "سجّل دخولك عشان تتابع طلباتك ومفضلتك"}
             </p>
-            <h1>{isRegister ? "تسجيل" : "دخول"}</h1>
-            {isRegister && (
-              <>
-                <input
-                  value={authName}
-                  onChange={(event) => setAuthName(event.target.value)}
-                  placeholder="الاسم الكامل"
-                  required
-                />
-                <input
-                  value={authPhone}
-                  onChange={(event) => setAuthPhone(event.target.value)}
-                  placeholder="رقم الهاتف"
-                  required
-                />
-              </>
-            )}
-            <input
-              type="email"
-              value={authEmail}
-              onChange={(event) => setAuthEmail(event.target.value)}
-              placeholder="البريد الإلكتروني"
-              required
-            />
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(event) => setAuthPassword(event.target.value)}
-              placeholder="كلمة المرور"
-              required
-            />
-            <button
-              type="submit"
-              className="panel-primary"
-              disabled={authLoading}
+
+            <div
+              className={`auth-toggle ${isRegister ? "is-register" : "is-login"}`}
+              role="tablist"
+              aria-label="تسجيل الدخول أو إنشاء حساب"
             >
-              {authLoading
-                ? "يرجى الانتظار..."
-                : isRegister
-                  ? "إنشاء حساب"
-                  : "دخول"}
-            </button>
-            {authError && <p className="inline-error">{authError}</p>}
-            <a className="text-link" href={isRegister ? "#login" : "#register"}>
-              {isRegister ? "لديك حساب بالفعل؟" : "إنشاء حساب جديد"}
-            </a>
-          </form>
+              <span className="auth-toggle-slider" aria-hidden="true" />
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!isRegister}
+                className={!isRegister ? "active" : ""}
+                onClick={() => {
+                  window.location.hash = "#login";
+                }}
+              >
+                تسجيل الدخول
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isRegister}
+                className={isRegister ? "active" : ""}
+                onClick={() => {
+                  window.location.hash = "#register";
+                }}
+              >
+                إنشاء حساب
+              </button>
+            </div>
+
+            <form
+              className="auth-form"
+              onSubmit={isRegister ? submitCustomerRegister : submitCustomerLogin}
+            >
+              {isRegister && (
+                <>
+                  <label className="auth-field">
+                    <User size={18} />
+                    <input
+                      value={authName}
+                      onChange={(event) => setAuthName(event.target.value)}
+                      placeholder="الاسم الكامل"
+                      required
+                    />
+                  </label>
+                  <label className="auth-field">
+                    <Phone size={18} />
+                    <input
+                      value={authPhone}
+                      onChange={(event) => setAuthPhone(event.target.value)}
+                      placeholder="رقم الهاتف"
+                      required
+                    />
+                  </label>
+                </>
+              )}
+              <label className="auth-field">
+                <Mail size={18} />
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="البريد الإلكتروني"
+                  required
+                />
+              </label>
+              <label className="auth-field">
+                <Lock size={18} />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="كلمة المرور"
+                  required
+                />
+              </label>
+
+              {!isRegister && (
+                <button
+                  type="button"
+                  className="auth-forgot"
+                  onClick={() => {
+                    const message = "مرحباً، نسيت كلمة المرور بتاعتي، ممكن تساعدوني؟";
+                    window.open(
+                      `https://wa.me/201503466584?text=${encodeURIComponent(message)}`,
+                      "_blank",
+                    );
+                  }}
+                >
+                  نسيت كلمة المرور؟
+                </button>
+              )}
+
+              <button type="submit" className="auth-submit" disabled={authLoading}>
+                {authLoading
+                  ? "يرجى الانتظار..."
+                  : isRegister
+                    ? "إنشاء حساب"
+                    : "تسجيل الدخول"}
+              </button>
+
+              {authError && <p className="inline-error">{authError}</p>}
+            </form>
+
+            <p className="auth-switch-text">
+              {isRegister ? "لديك حساب بالفعل؟" : "معندكش حساب؟"}{" "}
+              <a href={isRegister ? "#login" : "#register"}>
+                {isRegister ? "تسجيل الدخول" : "إنشاء حساب"}
+              </a>
+            </p>
+          </div>
         </section>
       </main>
     );
@@ -2176,7 +2344,7 @@ const addItemToCart = (
         <main className="site-shell admin-shell">
           <header className="nav-bar">
             <a className="brand" href="#catalog">
-              Home Style
+              <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
             </a>
             <nav aria-label="Admin navigation">
               <a href="#catalog">المتجر</a>
@@ -2225,7 +2393,8 @@ const addItemToCart = (
       <main className="site-shell admin-shell">
         <header className="nav-bar">
           <a className="brand" href="#catalog">
-            Home Style          </a>
+            <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
+          </a>
           <nav aria-label="Admin navigation">
             <a href="#catalog">Storefront</a>
             <a href="#admin">Admin Panel</a>
@@ -2805,7 +2974,8 @@ const addItemToCart = (
     <main className="site-shell">
       <header className="nav-bar">
         <a className="brand" href="/">
-          Home Style        </a>
+          <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
+        </a>
         <button
           type="button"
           className="mobile-menu-btn"
@@ -2825,13 +2995,6 @@ const addItemToCart = (
             onClick={() => setMobileMenuOpen(false)}
           >
             الكتالوج
-          </a>
-          <a
-            href="#details"
-            className={mainTab === "details" ? "active" : ""}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            تفاصيل
           </a>
           <a
             href="#checkout"
@@ -2864,15 +3027,7 @@ const addItemToCart = (
           >
             من نحن
           </button>
-          {customerProfile ? (
-            <a href="#logout" onClick={() => setMobileMenuOpen(false)}>
-              تسجيل الخروج
-            </a>
-          ) : (
-            <a href="#login" onClick={() => setMobileMenuOpen(false)}>
-              تسجيل الدخول
-            </a>
-          )}
+          
           {hasAdminToken && (
             <>
               <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
@@ -2938,15 +3093,15 @@ const addItemToCart = (
           <div
             className="contact-dropdown-container"
             onMouseLeave={() => setContactDropdownOpen(false)}
-          >
+            >
             <button
               type="button"
               onClick={() => setContactDropdownOpen(!contactDropdownOpen)}
-              aria-label="Contact us"
+              aria-label="تواصل معنا"
+              title="تواصل معنا"
               className={`nav-contact-btn ${contactDropdownOpen ? "active" : ""}`}
             >
-              <span className="contact-text">تواصل معنا</span>
-              <MessageCircle size={16} />
+              <Share2 size={20} />
             </button>
             {contactDropdownOpen && (
               <div className="contact-dropdown">
@@ -2955,10 +3110,13 @@ const addItemToCart = (
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <svg width="16" height="16" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", marginLeft: "8px" }}>
-                    <circle cx="30" cy="30" r="30" fill="#25D366"/>
-                    <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
-                  </svg>
+                  <img
+                  src="https://cdn.simpleicons.org/whatsapp/25D366"
+                  alt="WhatsApp"
+                  width="16"
+                  height="16"
+                  style={{ display: "inline-block", verticalAlign: "middle" }}
+                />
                   <span>واتساب</span>
                 </a>
                 <a
@@ -2966,15 +3124,53 @@ const addItemToCart = (
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <svg width="16" height="16" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", marginLeft: "8px" }}>
-                    <circle cx="30" cy="30" r="30" fill="#1877F2"/>
-                    <path fill="#FFFFFF" d="M33.5 31.5h4l.6-4.5h-4.6v-2.9c0-1.3.4-2.2 2.2-2.2h2.4V17.4c-.4-.1-1.9-.2-3.5-.2-3.5 0-5.9 2.1-5.9 6v3.3H25v4.5h3.7V43h5V31.5z"/>
-                  </svg>
+                  <img
+                  src="https://cdn.simpleicons.org/facebook/1877F2"
+                  alt="Facebook"
+                  width="16"
+                  height="16"
+                  style={{ display: "inline-block", verticalAlign: "middle" }}
+                />
                   <span>فيسبوك</span>
+                </a>
+                <a
+                  href="https://www.instagram.com/homestyle22237?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                  src="https://cdn.simpleicons.org/instagram/E4405F"
+                  alt="Instagram"
+                  width="16"
+                  height="16"
+                  style={{ display: "inline-block", verticalAlign: "middle" }}
+                />
+                  <span>انستجرام</span>
                 </a>
               </div>
             )}
           </div>
+          {customerProfile ? (
+            <a
+              href="#logout"
+              onClick={() => setMobileMenuOpen(false)}
+              className="nav-auth-btn"
+              aria-label="تسجيل الخروج"
+              title="تسجيل الخروج"
+            >
+              <LogOut size={20} />
+            </a>
+          ) : (
+            <a
+              href="#login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="nav-auth-btn"
+              aria-label="تسجيل الدخول"
+              title="تسجيل الدخول"
+            >
+              <LogIn size={20} />
+            </a>
+          )}
         </div>
       </header>
 
@@ -2997,9 +3193,21 @@ const addItemToCart = (
           ) : (
             <div className="favorites-grid">
               {favoriteProducts.map((fav) => {
-                const product = products.find(p => p.id === fav.product);
-                if (!product) return null;
-                const image = resolveAssetUrl(getImageUrl(product.images));
+                const loadedProduct = products.find(p => p.id === fav.product);
+                // Fall back to the data returned by the favorites API itself
+                // instead of skipping the item when it's not on the current
+                // products page/filter (e.g. different category, page 2, etc.)
+                const product: Product = loadedProduct ?? {
+                  id: fav.product,
+                  title: fav.product_title,
+                  slug: fav.product_slug,
+                  final_price: fav.product_final_price,
+                  category_name: "",
+                  images: null,
+                };
+                const image = loadedProduct
+                  ? resolveAssetUrl(getImageUrl(product.images))
+                  : null;
                 return (
                   <article className="favorite-card" key={fav.id}>
                     <button
@@ -3182,12 +3390,13 @@ const addItemToCart = (
               alignItems: "center",
               gap: "8px",
               padding: "10px 20px",
-              background: filtersOpen ? "var(--gold)" : "rgba(255,255,255,0.05)",
-              color: filtersOpen ? "#17130f" : "var(--cream)",
+              borderRadius: "var(--radius-btn)",
+              background: filtersOpen ? "var(--cream)" : "var(--panel)",
+              color: filtersOpen ? "var(--bg)" : "var(--cream)",
               border: "1px solid var(--line)",
               fontFamily: "var(--sans)",
               fontSize: "14px",
-              fontWeight: 600,
+              fontWeight: 500,
               cursor: "pointer",
               transition: "all 180ms ease"
             }}
@@ -3336,9 +3545,9 @@ const addItemToCart = (
                     aria-label={favorites.has(product.id) ? "Remove from favorites" : "Add to favorites"}
                   >
                     <Heart
-                      size={24}
+                      size={18}
                       fill={favorites.has(product.id) ? "#e74c3c" : "none"}
-                      color={favorites.has(product.id) ? "#e74c3c" : "#F1EFE8"}
+                      color={favorites.has(product.id) ? "#e74c3c" : "#333333"}
                     />
                   </button>
                   <div className="product-copy">
@@ -3363,26 +3572,28 @@ const addItemToCart = (
                         className="outline-btn"
                         onClick={() => openContextChat(product)}
                       >
-                        تواصل معنا
+                        <MessageCircle size={15} />
+                        تواصل مع البوت
+                      </button>
+                      <button
+                        type="button"
+                        className="outline-btn"
+                        onClick={() => {
+                          const message = `مرحباً، أريد طلب هذا المنتج:\n\n${product.title}\n\nالسعر: ${money(product.final_price)}\n\nالرابط: ${window.location.href}#catalog`;
+                          const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
+                          window.open(whatsappUrl, '_blank');
+                        }}
+                      >
+                        <img
+  src="https://cdn.simpleicons.org/whatsapp/25D366"
+  alt="WhatsApp"
+  width="16"
+  height="16"
+  style={{ display: "inline-block", verticalAlign: "middle" }}
+/>
+                        الطلب من واتساب
                       </button>
                     </div>
-
-                    <button
-                      type="button"
-                      className="outline-btn whatsapp-outline-btn"
-                      onClick={() => {
-                        const message = `مرحباً، أريد طلب هذا المنتج:\n\n${product.title}\n\nالسعر: ${money(product.final_price)}\n\nالرابط: ${window.location.href}#catalog`;
-                        const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
-                        window.open(whatsappUrl, '_blank');
-                      }}
-                      style={{ width: "100%", minHeight: "44px" }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="30" cy="30" r="30" fill="#25D366"/>
-                        <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
-                      </svg>
-                      طلب عبر واتساب
-                    </button>
 
                     <button
                       type="button"
@@ -3414,16 +3625,16 @@ const addItemToCart = (
 
             {(() => {
               const pages = [];
-              const maxVisible = 5;
+              const maxVisible = 4;
               if (totalPages <= maxVisible) {
                 for (let i = 1; i <= totalPages; i++) pages.push(i);
               } else {
-                let start = Math.max(1, currentPage - 2);
+                let start = Math.max(1, currentPage - 1);
                 let end = Math.min(totalPages, currentPage + 2);
                 if (start === 1) {
-                  end = 5;
+                  end = 4;
                 } else if (end === totalPages) {
-                  start = totalPages - 4;
+                  start = totalPages - 3;
                 }
                 for (let i = start; i <= end; i++) {
                   pages.push(i);
@@ -3446,11 +3657,12 @@ const addItemToCart = (
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: currentPage === pageNum ? "var(--gold)" : "transparent",
-                    color: currentPage === pageNum ? "#17130f" : "var(--cream)",
-                    border: currentPage === pageNum ? "1px solid var(--gold)" : "1px solid var(--line)",
+                    borderRadius: "var(--radius-btn)",
+                    background: currentPage === pageNum ? "var(--cream)" : "transparent",
+                    color: currentPage === pageNum ? "var(--bg)" : "var(--cream)",
+                    border: currentPage === pageNum ? "1px solid var(--cream)" : "1px solid var(--line)",
                     cursor: "pointer",
-                    fontWeight: "bold",
+                    fontWeight: 500,
                     fontFamily: "var(--sans)",
                     fontSize: distance === 0 ? "14px" : distance === 1 ? "12px" : "10px",
                     opacity: distance === 0 ? 1 : distance === 1 ? 0.6 : 0.25,
@@ -3520,6 +3732,7 @@ const addItemToCart = (
               : resolveAssetUrl(getImageUrl(activeProduct.images));
 
           return (
+            <>
             <section id="details" className="detail-section">
               <div className="detail-gallery">
                 {mainImageUrl ? (
@@ -3633,7 +3846,7 @@ const addItemToCart = (
                     <Heart
                       size={20}
                       fill={favorites.has(activeProduct.id) ? "#e74c3c" : "none"}
-                      color={favorites.has(activeProduct.id) ? "#e74c3c" : "#F1EFE8"}
+                      color={favorites.has(activeProduct.id) ? "#e74c3c" : "#333333"}
                     />
                     {favorites.has(activeProduct.id) ? "إزالة من المفضلة" : "إضافة للمفضلة"}
                   </button>
@@ -3659,15 +3872,73 @@ const addItemToCart = (
                       window.open(whatsappUrl, '_blank');
                     }}
                   >
-                    <svg width="18" height="18" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="30" cy="30" r="30" fill="#25D366"/>
-                      <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
-                    </svg>
+                    <img
+  src="https://cdn.simpleicons.org/whatsapp/25D366"
+  alt="WhatsApp"
+  width="16"
+  height="16"
+  style={{ display: "inline-block", verticalAlign: "middle" }}
+/>
                     طلب عبر واتساب
                   </button>
                 </div>
               </div>
             </section>
+
+            {relatedProducts.length > 0 && (
+              <section className="related-section">
+                <div className="related-heading">
+                  <p className="eyebrow">قد يعجبك أيضاً</p>
+                  <h2>منتجات مشابهة</h2>
+                </div>
+                <div className="related-grid">
+                  {relatedProducts.map((related) => {
+                    const relatedImage = resolveAssetUrl(
+                      getImageUrl(related.images),
+                    );
+                    return (
+                      <article className="related-card" key={related.id}>
+                        <button
+                          type="button"
+                          className="related-card-image"
+                          onClick={() => openProductDetails(related)}
+                          aria-label={`Open details for ${related.title}`}
+                        >
+                          {relatedImage ? (
+                            <img src={relatedImage} alt={related.title} />
+                          ) : (
+                            <span className="image-placeholder">
+                              No Image
+                            </span>
+                          )}
+                        </button>
+                        <div className="related-card-copy">
+                          <p className="price">{money(related.final_price)}</p>
+                          <h3>{related.title}</h3>
+                        </div>
+                        <div className="related-card-actions">
+                          <button
+                            type="button"
+                            className="outline-btn"
+                            onClick={() => openProductDetails(related)}
+                          >
+                            التفاصيل
+                          </button>
+                          <button
+                            type="button"
+                            className="primary-btn"
+                            onClick={() => addToCart(related)}
+                          >
+                            أضف للسلة
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+            </>
           );
         })()}
       </div>
@@ -3711,7 +3982,7 @@ const addItemToCart = (
                     {item.selectedLocation && (
                       <div className="checkout-item-shipping">
                         <span>الشحن إلى: {item.selectedLocation}</span>
-                        <span className="shipping-price">{money(item.shippingPrice)}</span>
+                        <span className="shipping-price">{money((item.shippingPrice || 0) * item.quantity)}</span>
                       </div>
                     )}
                   </div>
@@ -3909,7 +4180,7 @@ const addItemToCart = (
                     <span>{money(itemUnitPrice(item))}</span>
                     {item.selectedLocation && (
                       <small className="shipping-info">
-                        الشحن إلى: {item.selectedLocation} ({money(item.shippingPrice)})
+                        الشحن إلى: {item.selectedLocation} ({money((item.shippingPrice || 0) * item.quantity)})
                       </small>
                     )}
                   </div>
@@ -3967,15 +4238,18 @@ const addItemToCart = (
                     const orderMessage = cart.map(item =>
                       `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}`
                     ).join('\n');
-                    const message = `مرحباً، أريد إنشاء طلب جديد:\n\n${orderMessage}\n\nالمجموع: ${money(grandTotal)}\nالشحن: ${money(totalShipping)}\nالإجمالي: ${money(grandTotal + totalShipping)}`;
+                    const message = `مرحباً، أريد إنشاء طلب جديد:\n\n${orderMessage}\n\nالمجموع: ${money(subtotal)}\nالشحن: ${money(totalShipping)}\nالإجمالي: ${money(grandTotal)}`;
                     const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
                   }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="30" cy="30" r="30" fill="#25D366"/>
-                    <path fill="#FFFFFF" d="M30 14c-9.4 0-17 7.6-17 17 0 3 .8 5.9 2.3 8.5L13 46l6.7-2.2c2.5 1.4 5.3 2.1 8.3 2.1 9.4 0 17-7.6 17-17s-7.6-17-17-17zm0 31c-2.7 0-5.3-.7-7.6-2.1l-.5-.3-4 1.3 1.3-3.9-.3-.5C17.6 37.1 17 34.6 17 32c0-7.2 5.8-13 13-13s13 5.8 13 13-5.8 13-13 13zm7.1-9.7c-.4-.2-2.3-1.1-2.6-1.3-.4-.1-.6-.2-.9.2-.3.4-1 1.3-1.3 1.5-.2.3-.5.3-.9.1-.4-.2-1.7-.6-3.2-2-1.2-1.1-2-2.4-2.2-2.8-.2-.4 0-.6.2-.8.2-.2.4-.5.6-.7.2-.2.3-.4.4-.7.1-.3.1-.5 0-.7-.1-.2-.9-2.2-1.3-3-.3-.8-.7-.7-.9-.7h-.8c-.3 0-.7.1-1.1.5-.4.4-1.4 1.4-1.4 3.4s1.5 3.9 1.7 4.2c.2.3 3 4.5 7.2 6.3 1 .4 1.8.7 2.4.9 1 .3 1.9.3 2.7.2.8-.1 2.3-1 2.7-1.9.3-.9.3-1.7.2-1.9-.1-.2-.3-.3-.7-.5z"/>
-                  </svg>
+                  <img
+  src="https://cdn.simpleicons.org/whatsapp/25D366"
+  alt="WhatsApp"
+  width="16"
+  height="16"
+  style={{ display: "inline-block", verticalAlign: "middle" }}
+/>
                   طلب عبر واتساب
                 </button>
               </div>
