@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
+  BarChart,
   CheckCircle2,
   Heart,
+  Home,
   ImageUp,
   Loader2,
   Lock,
@@ -903,6 +905,7 @@ function App() {
   const [adminPassword, setAdminPassword] = useState("");
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [activeAdminTab, setActiveAdminTab] = useState("dashboard");
   const [agentSettings, setAgentSettings] = useState<AgentSettingsState | null>(
     null,
   );
@@ -2413,17 +2416,15 @@ const addItemToCart = (
           </div>
         </header>
 
-        <section className="admin-panel">
-          <div className="admin-heading">
-            <p className="eyebrow">لوحة الإدارة</p>
-            <h1>التحكم في خدمة العملاء</h1>
-            <p>
-              إدارة الردود التلقائية، وضع المراجعة البشرية، والمفتاح العام لخدمة العملاء.
-            </p>
-          </div>
-
+        <section className={`admin-panel ${hasAdminToken ? "admin-dashboard-layout" : ""}`}>
           {!hasAdminToken ? (
-            <form className="admin-card login-card" onSubmit={submitAdminLogin}>
+            <div className="admin-login-wrapper">
+              <div className="admin-heading">
+                <p className="eyebrow">لوحة الإدارة</p>
+                <h1>تسجيل الدخول</h1>
+              </div>
+              <form className="admin-card login-card" onSubmit={submitAdminLogin}>
+
               <h2>تسجيل دخول الإدارة</h2>
               <input
                 type="email"
@@ -2448,85 +2449,63 @@ const addItemToCart = (
               </button>
               {adminError && <p className="inline-error">{adminError}</p>}
             </form>
+            </div>
           ) : (
-            <div className="admin-grid">
-              <section className="admin-card">
-                <div className="admin-card-title">
-                  <Settings size={22} />
-                  <h2>وضع خدمة العملاء</h2>
+            <>
+              <aside className="admin-sidebar">
+                <div className="admin-sidebar-header">
+                  <h2>لوحة التحكم</h2>
                 </div>
-                {adminLoading && <p className="muted">جاري تحميل بيانات الإدارة...</p>}
-                {adminError && <p className="inline-error">{adminError}</p>}
-                {agentSettings && (
-                  <>
-                    <label className="switch-row">
-                      <span>تفعيل خدمة العملاء</span>
-                      <input
-                        type="checkbox"
-                        checked={agentSettings.is_globally_active}
-                        onChange={(event) =>
-                          updateAgentMode({
-                            is_globally_active: event.target.checked,
-                          })
-                        }
-                      />
-                    </label>
-                    <div
-                      className="mode-control"
-                      role="group"
-                      aria-label="وضع الرد"
-                    >
-                      <button
-                        type="button"
-                        className={
-                          agentSettings.auto_reply_mode === "full_auto"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          updateAgentMode({ auto_reply_mode: "full_auto" })
-                        }
-                      >
-                        تلقائي كامل
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          agentSettings.auto_reply_mode === "suggest_only"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          updateAgentMode({ auto_reply_mode: "suggest_only" })
-                        }
-                      >
-                        اقتراحات فقط
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          agentSettings.auto_reply_mode === "off"
-                            ? "active"
-                            : ""
-                        }
-                        onClick={() =>
-                          updateAgentMode({ auto_reply_mode: "off" })
-                        }
-                      >
-                        إيقاف
-                      </button>
-                    </div>
-                    <p className="admin-note">
-                      الوضع الحالي:{" "}
-                      <strong>{agentSettings.auto_reply_mode}</strong>. استخدم التلقائي الكامل عندما تريد من خدمة العملاء الرد على العملاء تلقائياً.
-                    </p>
-                  </>
-                )}
-              </section>
+                <nav className="admin-sidebar-nav">
+                  <button 
+                    type="button"
+                    className={activeAdminTab === "dashboard" ? "active" : ""} 
+                    onClick={() => setActiveAdminTab("dashboard")}
+                  >
+                    <Home size={18} />
+                    الرئيسية
+                  </button>
+                  <button 
+                    type="button"
+                    className={activeAdminTab === "orders" ? "active" : ""} 
+                    onClick={() => { setActiveAdminTab("orders"); loadAdminData(); }}
+                  >
+                    <ShoppingBag size={18} />
+                    إدارة الطلبات
+                  </button>
+                  <button 
+                    type="button"
+                    className={activeAdminTab === "commissions" ? "active" : ""} 
+                    onClick={() => { setActiveAdminTab("commissions"); loadAdminData(); }}
+                  >
+                    <CheckCircle2 size={18} />
+                    العمولات
+                  </button>
+                  <button 
+                    type="button"
+                    className={activeAdminTab === "agent" ? "active" : ""} 
+                    onClick={() => setActiveAdminTab("agent")}
+                  >
+                    <MessageCircle size={18} />
+                    خدمة العملاء AI
+                  </button>
+                  <button 
+                    type="button"
+                    className={activeAdminTab === "analytics" ? "active" : ""} 
+                    onClick={() => setActiveAdminTab("analytics")}
+                  >
+                    <BarChart size={18} />
+                    التحليلات
+                  </button>
+                </nav>
+              </aside>
+              <main className="admin-main-content">
+                {activeAdminTab === "dashboard" && (
+                  <div className="admin-tab-content">
+                    <section className="admin-card">
+                      <h2>إحصائيات المتجر</h2>
+                      <div className="admin-stats">
 
-              <section className="admin-card">
-                <h2>إحصائيات المتجر</h2>
-                <div className="admin-stats">
                   <span>
                     <strong>{dashboardStats?.active_products ?? "-"}</strong>
                     منتجات
@@ -2544,158 +2523,14 @@ const addItemToCart = (
                     </strong>
                     عمولة معلقة
                   </span>
-                </div>
-              </section>
-
-              <section className="admin-card">
-                <div className="admin-card-title">
-                  <ImageUp size={22} />
-                  <h2>صور المنتج لخدمة العملاء</h2>
-                </div>
-                <p className="admin-note">
-                  ارفع صور المنتجات أو لقطات الشاشة. خدمة العملاء ستقرأها كمدخلات وتعد إجراءات إنشاء المنتج.
-                </p>
-                <form
-                  className="agent-upload-form"
-                  onSubmit={uploadAgentProductImages}
-                >
-                  <input type="file" name="images" accept="image/*" multiple />
-                  <button
-                    type="submit"
-                    className="panel-primary"
-                    disabled={agentUploadLoading}
-                  >
-                    {agentUploadLoading ? "جاري الرفع..." : "إرسال"}
-                  </button>
-                </form>
-              </section>
-
-              <section className="admin-card admin-agent-card">
-                <div className="admin-card-title">
-                  <MessageCircle size={22} />
-                  <h2>خدمة العملاء</h2>
-                </div>
-                <p className="admin-note">
-                  تواصل مع خدمة العملاء حتى يتم إعداد المسودة بشكل صحيح. أرسل نص المتطلبات أو صورة المتطلبات، ثم أرفق صور المنتج النهائية بشكل منفصل.
-                </p>
-                <div className="admin-agent-layout">
-                  <div className="admin-agent-chat-column">
-                    <div className="admin-thread-messages">
-                      {adminAgentMessages.map((message) => (
-                        <p
-                          className={`message ${getMessageSender(message)}`}
-                          key={message.id}
-                        >
-                          {cleanMessageContent(message.content)}
-                        </p>
-                      ))}
-                    </div>
-                    <form
-                      className="admin-agent-form"
-                      onSubmit={submitAdminAgentDraft}
-                    >
-                      <textarea
-                        name="source_text"
-                        placeholder="اكتب للإيجنت: استخرج المنتج، أو صحح الخامة/السعر/العمولة/التصنيف..."
-                      />
-                      <label>
-                        <span>صورة المتطلبات بدلاً من النص</span>
-                        <input
-                          type="file"
-                          name="source_files"
-                          accept="image/*"
-                          multiple
-                        />
-                      </label>
-                      <label>
-                        <span>صور المنتج النهائية لقاعدة البيانات</span>
-                        <input
-                          type="file"
-                          name="product_images"
-                          accept="image/*"
-                          multiple
-                        />
-                      </label>
-                      <div className="admin-agent-actions">
-                        <button
-                          type="submit"
-                          name="intent"
-                          value="draft"
-                          disabled={adminAgentLoading}
-                        >
-                          {adminAgentLoading ? "جاري العمل..." : "إرسال"}
-                        </button>
-                        <button
-                          type="submit"
-                          name="intent"
-                          value="approve"
-                          disabled={
-                            adminAgentLoading || !isDraftReady(adminAgentDraft)
-                          }
-                        >
-                          إرسال الموافقة لتيليجرام
-                        </button>
-                      </div>
-                    </form>
+                                      </div>
+                    </section>
                   </div>
-                  <aside className="admin-draft-panel">
-                    <div className="admin-thread-header">
-                      <strong>مسودة المنتج</strong>
-                      <span>
-                        {isDraftReady(adminAgentDraft)
-                          ? "جاهز"
-                          : "يحتاج تفاصيل"}
-                      </span>
-                    </div>
-                    {!adminAgentDraft ? (
-                      <p className="muted">
-                        أرسل نص المتطلبات أو صورة لبدء الاستخراج.
-                      </p>
-                    ) : (
-                      <>
-                        <dl className="admin-draft-list">
-                          {draftRows.map(([key, label]) => (
-                            <div
-                              className={adminAgentDraft[key] ? "" : "missing"}
-                              key={key}
-                            >
-                              <dt>{label}</dt>
-                              <dd>
-                                {formatDraftValue(key, adminAgentDraft[key])}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                        {Array.isArray(adminAgentDraft.missing_fields) &&
-                          adminAgentDraft.missing_fields.length > 0 && (
-                            <div className="draft-warning">
-                              مفقود:{" "}
-                              {adminAgentDraft.missing_fields
-                                .map(String)
-                                .join(", ")}
-                            </div>
-                          )}
-                        <div className="draft-images">
-                          <strong>صور المنتج</strong>
-                          <span>
-                            {Array.isArray(adminAgentDraft.images)
-                              ? adminAgentDraft.images.length
-                              : 0}{" "}
-                            محفوظة في المسودة
-                          </span>
-                        </div>
-                        <p className="admin-note">
-                          لما التفاصيل تبقى مظبوطة، دوس زر إرسال الموافقة
-                          لتيليجرام. بعد موافقتك هناك المنتج يتحفظ في قاعدة
-                          البيانات.
-                        </p>
-                      </>
-                    )}
-                  </aside>
-                </div>
-              </section>
+                )}
+                {activeAdminTab === "orders" && (
+                  <div className="admin-tab-content">
+                    <section className="admin-card admin-orders-card">
 
-              <section className="admin-card admin-orders-card">
                 <div className="admin-card-title">
                   <ShoppingBag size={22} />
                   <h2>إدارة الطلبات</h2>
@@ -2832,7 +2667,12 @@ const addItemToCart = (
                 </div>
               </section>
 
-              <section className="admin-card admin-commissions-card">
+                                </div>
+                )}
+                {activeAdminTab === "commissions" && (
+                  <div className="admin-tab-content">
+                    <section className="admin-card admin-commissions-card">
+
                 <div className="admin-card-title">
                   <CheckCircle2 size={22} />
                   <h2>العمولات</h2>
@@ -2954,7 +2794,246 @@ const addItemToCart = (
                   </div>
                 </div>
               </section>
-            </div>
+                              </div>
+                )}
+                {activeAdminTab === "agent" && (
+                  <div className="admin-tab-content admin-agent-grid">
+                    <section className="admin-card">
+                      <div className="admin-card-title">
+                        <Settings size={22} />
+                        <h2>وضع خدمة العملاء</h2>
+                      </div>
+
+                {adminLoading && <p className="muted">جاري تحميل بيانات الإدارة...</p>}
+                {adminError && <p className="inline-error">{adminError}</p>}
+                {agentSettings && (
+                  <>
+                    <label className="switch-row">
+                      <span>تفعيل خدمة العملاء</span>
+                      <input
+                        type="checkbox"
+                        checked={agentSettings.is_globally_active}
+                        onChange={(event) =>
+                          updateAgentMode({
+                            is_globally_active: event.target.checked,
+                          })
+                        }
+                      />
+                    </label>
+                    <div
+                      className="mode-control"
+                      role="group"
+                      aria-label="وضع الرد"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          agentSettings.auto_reply_mode === "full_auto"
+                            ? "active"
+                            : ""
+                        }
+                        onClick={() =>
+                          updateAgentMode({ auto_reply_mode: "full_auto" })
+                        }
+                      >
+                        تلقائي كامل
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          agentSettings.auto_reply_mode === "suggest_only"
+                            ? "active"
+                            : ""
+                        }
+                        onClick={() =>
+                          updateAgentMode({ auto_reply_mode: "suggest_only" })
+                        }
+                      >
+                        اقتراحات فقط
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          agentSettings.auto_reply_mode === "off"
+                            ? "active"
+                            : ""
+                        }
+                        onClick={() =>
+                          updateAgentMode({ auto_reply_mode: "off" })
+                        }
+                      >
+                        إيقاف
+                      </button>
+                    </div>
+                    <p className="admin-note">
+                      الوضع الحالي:{" "}
+                      <strong>{agentSettings.auto_reply_mode}</strong>. استخدم التلقائي الكامل عندما تريد من خدمة العملاء الرد على العملاء تلقائياً.
+                    </p>
+                  </>
+                )}
+              </section>
+
+              
+                    <section className="admin-card">
+                      <div className="admin-card-title">
+                        <ImageUp size={22} />
+                        <h2>صور المنتج لخدمة العملاء</h2>
+
+                </div>
+                <p className="admin-note">
+                  ارفع صور المنتجات أو لقطات الشاشة. خدمة العملاء ستقرأها كمدخلات وتعد إجراءات إنشاء المنتج.
+                </p>
+                <form
+                  className="agent-upload-form"
+                  onSubmit={uploadAgentProductImages}
+                >
+                  <input type="file" name="images" accept="image/*" multiple />
+                  <button
+                    type="submit"
+                    className="panel-primary"
+                    disabled={agentUploadLoading}
+                  >
+                    {agentUploadLoading ? "جاري الرفع..." : "إرسال"}
+                  </button>
+                </form>
+              </section>
+
+              
+                    <section className="admin-card admin-agent-card">
+
+                <div className="admin-card-title">
+                  <MessageCircle size={22} />
+                  <h2>خدمة العملاء</h2>
+                </div>
+                <p className="admin-note">
+                  تواصل مع خدمة العملاء حتى يتم إعداد المسودة بشكل صحيح. أرسل نص المتطلبات أو صورة المتطلبات، ثم أرفق صور المنتج النهائية بشكل منفصل.
+                </p>
+                <div className="admin-agent-layout">
+                  <div className="admin-agent-chat-column">
+                    <div className="admin-thread-messages">
+                      {adminAgentMessages.map((message) => (
+                        <p
+                          className={`message ${getMessageSender(message)}`}
+                          key={message.id}
+                        >
+                          {cleanMessageContent(message.content)}
+                        </p>
+                      ))}
+                    </div>
+                    <form
+                      className="admin-agent-form"
+                      onSubmit={submitAdminAgentDraft}
+                    >
+                      <textarea
+                        name="source_text"
+                        placeholder="اكتب للإيجنت: استخرج المنتج، أو صحح الخامة/السعر/العمولة/التصنيف..."
+                      />
+                      <label>
+                        <span>صورة المتطلبات بدلاً من النص</span>
+                        <input
+                          type="file"
+                          name="source_files"
+                          accept="image/*"
+                          multiple
+                        />
+                      </label>
+                      <label>
+                        <span>صور المنتج النهائية لقاعدة البيانات</span>
+                        <input
+                          type="file"
+                          name="product_images"
+                          accept="image/*"
+                          multiple
+                        />
+                      </label>
+                      <div className="admin-agent-actions">
+                        <button
+                          type="submit"
+                          name="intent"
+                          value="draft"
+                          disabled={adminAgentLoading}
+                        >
+                          {adminAgentLoading ? "جاري العمل..." : "إرسال"}
+                        </button>
+                        <button
+                          type="submit"
+                          name="intent"
+                          value="approve"
+                          disabled={
+                            adminAgentLoading || !isDraftReady(adminAgentDraft)
+                          }
+                        >
+                          إرسال الموافقة لتيليجرام
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                  <aside className="admin-draft-panel">
+                    <div className="admin-thread-header">
+                      <strong>مسودة المنتج</strong>
+                      <span>
+                        {isDraftReady(adminAgentDraft)
+                          ? "جاهز"
+                          : "يحتاج تفاصيل"}
+                      </span>
+                    </div>
+                    {!adminAgentDraft ? (
+                      <p className="muted">
+                        أرسل نص المتطلبات أو صورة لبدء الاستخراج.
+                      </p>
+                    ) : (
+                      <>
+                        <dl className="admin-draft-list">
+                          {draftRows.map(([key, label]) => (
+                            <div
+                              className={adminAgentDraft[key] ? "" : "missing"}
+                              key={key}
+                            >
+                              <dt>{label}</dt>
+                              <dd>
+                                {formatDraftValue(key, adminAgentDraft[key])}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                        {Array.isArray(adminAgentDraft.missing_fields) &&
+                          adminAgentDraft.missing_fields.length > 0 && (
+                            <div className="draft-warning">
+                              مفقود:{" "}
+                              {adminAgentDraft.missing_fields
+                                .map(String)
+                                .join(", ")}
+                            </div>
+                          )}
+                        <div className="draft-images">
+                          <strong>صور المنتج</strong>
+                          <span>
+                            {Array.isArray(adminAgentDraft.images)
+                              ? adminAgentDraft.images.length
+                              : 0}{" "}
+                            محفوظة في المسودة
+                          </span>
+                        </div>
+                        <p className="admin-note">
+                          لما التفاصيل تبقى مظبوطة، دوس زر إرسال الموافقة
+                          لتيليجرام. بعد موافقتك هناك المنتج يتحفظ في قاعدة
+                          البيانات.
+                        </p>
+                      </>
+                    )}
+                  </aside>
+                </div>
+              </section>
+
+                                </div>
+                )}
+                {activeAdminTab === "analytics" && (
+                  <div className="admin-tab-content">
+                    <AnalyticsDashboard onBack={() => setActiveAdminTab("dashboard")} />
+                  </div>
+                )}
+              </main>
+            </>
           )}
         </section>
 

@@ -748,13 +748,13 @@ button {
   overflow: hidden;
   background: var(--panel);
   box-sizing: border-box;
-  padding: 14px;
+  padding: 0;
 }
 
 .image-button img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   transition:
     transform 360ms ease,
     filter 360ms ease;
@@ -3942,7 +3942,7 @@ button {
   justify-content: center;
   width: 100%;
   aspect-ratio: 1 / 1;
-  padding: 14px;
+  padding: 0;
   background: var(--panel);
   box-sizing: border-box;
 }
@@ -3950,7 +3950,7 @@ button {
 .related-card-image img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   transition: transform 300ms ease;
 }
 
@@ -4332,4 +4332,461 @@ button {
 }
 .nav-bar nav.mobile-open a.nav-auth-btn {
   display: flex;
+}
+/* ===== Admin Dashboard Sidebar Redesign (Light Theme) ===== */
+.admin-dashboard-layout {
+  display: flex;
+  padding: 0;
+  min-height: calc(100svh - 76px);
+  background: var(--panel);
+}
+
+.admin-login-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100svh - 76px);
+  padding: 40px 18px;
+  background: var(--panel);
+}
+
+/* --- Sidebar --- */
+.admin-sidebar {
+  width: 260px;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 76px;
+  height: calc(100svh - 76px);
+}
+
+.admin-sidebar-header {
+  padding: 0 24px 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.admin-sidebar-header h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.admin-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.admin-sidebar-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--sans);
+  text-align: right;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-sidebar-nav button:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.admin-sidebar-nav button.active {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* --- Main Content Area --- */
+.admin-main-content {
+  flex: 1;
+  padding: 32px 36px;
+  overflow-y: auto;
+  min-width: 0;
+  max-height: calc(100svh - 76px);
+}
+
+.admin-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: adminFadeIn 0.25s ease-out;
+}
+
+.admin-agent-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@keyframes adminFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Light-themed overrides for admin cards --- */
+.admin-dashboard-layout .admin-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.admin-dashboard-layout .admin-card h2 {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-dashboard-layout .admin-card-title {
+  color: var(--text);
+}
+
+.admin-dashboard-layout .admin-card-title h2 {
+  font-size: 18px;
+}
+
+/* --- Light-themed inputs --- */
+.admin-dashboard-layout .admin-card input[type="email"],
+.admin-dashboard-layout .admin-card input[type="password"],
+.admin-dashboard-layout .admin-card input[type="text"],
+.admin-dashboard-layout .admin-card input:not([type]) {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-filter-row select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .agent-upload-form input[type="file"] {
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-agent-form textarea {
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-agent-form input[type="file"] {
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-input);
+}
+
+/* --- Stats cards with icons --- */
+.admin-dashboard-layout .admin-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-dashboard-layout .admin-stats span {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  text-align: center;
+  padding: 20px 14px;
+  min-height: 110px;
+}
+
+.admin-dashboard-layout .admin-stats strong {
+  color: var(--text);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* --- Orders list & detail --- */
+.admin-dashboard-layout .admin-orders-card,
+.admin-dashboard-layout .admin-commissions-card {
+  max-height: none;
+  overflow: visible;
+}
+
+.admin-dashboard-layout .admin-orders-list,
+.admin-dashboard-layout .admin-order-detail {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.admin-dashboard-layout .admin-order-item {
+  text-align: right;
+}
+
+.admin-dashboard-layout .admin-order-item strong {
+  color: var(--text);
+}
+
+.admin-dashboard-layout .admin-order-item.active {
+  background: var(--panel);
+}
+
+.admin-dashboard-layout .admin-order-item small {
+  color: var(--muted);
+}
+
+.admin-dashboard-layout .admin-detail-list div {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+  background: var(--panel);
+}
+
+.admin-dashboard-layout .admin-detail-list dt {
+  color: var(--muted);
+}
+
+.admin-dashboard-layout .admin-detail-list dd {
+  color: var(--text);
+}
+
+.admin-dashboard-layout .admin-items-list span {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+/* --- Status action buttons --- */
+.admin-dashboard-layout .admin-status-actions button {
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-status-actions button.active {
+  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+}
+
+/* --- Mode control buttons --- */
+.admin-dashboard-layout .mode-control button {
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .mode-control button.active {
+  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+}
+
+/* --- Switch row --- */
+.admin-dashboard-layout .switch-row {
+  color: var(--text);
+}
+
+/* --- Agent chat & draft panels --- */
+.admin-dashboard-layout .admin-agent-chat-column {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.admin-dashboard-layout .admin-draft-panel {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.admin-dashboard-layout .admin-draft-list div {
+  background: var(--panel);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-draft-list dd {
+  color: var(--text);
+}
+
+.admin-dashboard-layout .admin-draft-list .missing dd,
+.admin-dashboard-layout .draft-warning {
+  color: #dc584a;
+}
+
+.admin-dashboard-layout .draft-images strong {
+  color: var(--text);
+}
+
+/* --- Agent actions --- */
+.admin-dashboard-layout .admin-agent-actions button {
+  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+  border-radius: var(--radius-input);
+}
+
+/* --- Admin note text --- */
+.admin-dashboard-layout .admin-note {
+  color: var(--muted);
+}
+
+.admin-dashboard-layout .admin-note strong {
+  color: var(--text);
+}
+
+/* --- Thread header --- */
+.admin-dashboard-layout .admin-thread-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-dashboard-layout .admin-thread-header strong {
+  color: var(--text);
+}
+
+.admin-dashboard-layout .admin-thread-header span {
+  color: var(--muted);
+}
+
+/* --- Admin mini action btn --- */
+.admin-dashboard-layout .admin-mini-action {
+  color: var(--text);
+  border-color: var(--line);
+}
+
+/* --- Commission table --- */
+.admin-dashboard-layout .commission-row {
+  border-color: var(--line);
+}
+
+.admin-dashboard-layout .commission-row button {
+  color: #fff;
+  background: var(--text);
+  border-color: var(--text);
+  border-radius: var(--radius-input);
+}
+
+/* --- Chat messages --- */
+.admin-dashboard-layout .message.admin {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.admin-dashboard-layout .message.agent {
+  background: var(--text);
+  color: #fff;
+}
+
+/* --- Admin reply form --- */
+.admin-dashboard-layout .admin-reply-form input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-dashboard-layout .admin-reply-form button {
+  color: #fff;
+  background: var(--text);
+  border-radius: var(--radius-input);
+}
+
+/* --- Login card light fix --- */
+.admin-login-wrapper .admin-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+
+.admin-login-wrapper .admin-card h2 {
+  color: var(--text);
+  font-size: 22px;
+}
+
+.admin-login-wrapper .admin-card input[type="email"],
+.admin-login-wrapper .admin-card input[type="password"] {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+}
+
+.admin-login-wrapper .panel-primary {
+  color: #fff;
+  background: var(--text);
+  border: none;
+  border-radius: var(--radius-btn);
+  min-height: 50px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .admin-dashboard-layout {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    width: 100%;
+    border-left: none;
+    border-bottom: 1px solid var(--line);
+    padding: 16px 0;
+    position: static;
+    height: auto;
+  }
+  .admin-sidebar-header {
+    padding: 0 16px 16px;
+  }
+  .admin-sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 16px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-sidebar-nav button {
+    padding: 10px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .admin-main-content {
+    padding: 20px 16px;
+    max-height: none;
+  }
+  .admin-dashboard-layout .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .admin-dashboard-layout .admin-orders-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-dashboard-layout .admin-agent-layout {
+    grid-template-columns: 1fr;
+  }
+  .admin-dashboard-layout .admin-status-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-dashboard-layout .admin-stats {
+    grid-template-columns: 1fr;
+  }
 }
