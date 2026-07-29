@@ -828,6 +828,16 @@ const trackVisit = (path: string) => {
   } catch {} // silent fail
 };
 
+const trackFunnelEvent = (eventType: string, productId?: string) => {
+  try {
+    fetch('/api/track-funnel-event/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_type: eventType, product_id: productId }),
+    }).catch(() => {});
+  } catch {}
+};
+
 function App() {
   const [hash, setHash] = useState(window.location.hash || "#catalog");
   const [products, setProducts] = useState<Product[]>([]);
@@ -1519,6 +1529,7 @@ const mainTab = useMemo<
 
 const openProductDetails = async (product: Product) => {
   setSavedScrollPos(window.scrollY);
+    trackFunnelEvent('product_view', product.id);
   setActiveProduct(product);
   setActiveImageIndex(0);
   setDetailSelectedVariant(pickDefaultVariant(product)); 
@@ -1574,6 +1585,10 @@ const selectProductSize = (product: Product, variant: ProductVariant) => {
   setSizeModalOpen(false);
   proceedAddToCart(product, variant);
 };
+const openCheckout = () => {
+  trackFunnelEvent('checkout_start');
+  openCheckout();
+};
 
 const addItemToCart = (
   product: Product,
@@ -1581,6 +1596,7 @@ const addItemToCart = (
   location: string | null,
   shippingPrice: number,
 ) => {
+    trackFunnelEvent('add_to_cart', product.id);
   const key = cartItemKey(product, variant);
   setCart((current) => {
     const existing = current.find((item) => cartItemKey(item.product, item.selectedVariant) === key);
@@ -1874,6 +1890,7 @@ const addItemToCart = (
 
     try {
       const order = await api.createOrder(pendingOrderPayload, depositProofFile);
+      trackFunnelEvent('order_complete');
       setOrderResult(order);
       setCart([]);
       setCheckoutOpen(false);
@@ -4035,7 +4052,7 @@ const addItemToCart = (
         <button
           type="button"
           className="primary-link"
-          onClick={() => setCheckoutOpen(true)}
+          onClick={() => openCheckout()}
         >
           فتح صفحة الدفع
         </button>
@@ -4304,7 +4321,7 @@ const addItemToCart = (
                   type="button"
                   className="panel-primary"
                   onClick={() => {
-                    setCheckoutOpen(true);
+                    openCheckout();
                     setCartOpen(false);
                   }}
                 >

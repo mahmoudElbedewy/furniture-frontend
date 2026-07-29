@@ -1,24 +1,107 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Eye, Heart, Globe, Target, AlertTriangle } from 'lucide-react';
-import { fetchOverview, type OverviewData } from './api';
+import {
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend,
+} from 'recharts';
+import { TrendingUp, TrendingDown, Eye, Heart, Globe, Target, AlertTriangle, Info, Zap, X, GitCompare } from 'lucide-react';
+import { fetchOverview, fetchAlerts, markAlertRead, type OverviewData, type AnalyticsAlertItem } from './api';
 import { OverviewSkeleton } from './Skeletons';
 import type { DateRangeState } from './useDateRange';
 
-function KpiCard({ icon: Icon, label, value, trend, accent }: {
-  icon: React.ComponentType<{ className?: string }>; label: string; value: string | number; trend: number; accent: string;
+function VisualKpiCard({
+  icon: Icon,
+  label,
+  value,
+  prevValue,
+  trend,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  prevValue?: number;
+  trend: number;
+  accent: string;
 }) {
   const isPositive = trend >= 0;
+  const cur = value || 0;
+  const prv = prevValue || 0;
+  const maxVal = Math.max(cur, prv, 1);
+  const curPct = Math.min(100, Math.round((cur / maxVal) * 100));
+  const prvPct = Math.min(100, Math.round((prv / maxVal) * 100));
+
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md">
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md transition-all hover:border-white/[0.14]">
       <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl" style={{ background: accent }} />
-      <div className="flex items-center gap-2 text-slate-400 mb-3">
-        <Icon className="h-5 w-5" /><span className="text-xs">{label}</span>
+
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 text-slate-400">
+          <Icon className="h-4 w-4 text-slate-300" />
+          <span className="text-xs font-medium">{label}</span>
+        </div>
+        <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-bold ${
+          isPositive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+        }`}>
+          {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {isPositive ? '+' : ''}{trend}%
+        </span>
       </div>
-      <p className="text-2xl font-bold text-slate-100">{value}</p>
-      <span className={`mt-1 inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
-        {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-        {Math.abs(trend)}% vs previous period
-      </span>
+
+      <p className="text-2xl font-bold tracking-tight text-slate-100 mb-3">
+        {cur.toLocaleString()}
+      </p>
+
+      {/* ── Visual Bar Comparison ── */}
+      <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+        <div className="space-y-1">
+          <div className="flex justify-between text-[11px] text-slate-400">
+            <span>الفترة الحالية</span>
+            <span className="font-semibold text-slate-200">{cur.toLocaleString()}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${curPct}%`, background: accent }} />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-[11px] text-slate-500">
+            <span>فترة المقارنة</span>
+            <span className="font-medium text-slate-400">{prv.toLocaleString()}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-full rounded-full bg-slate-600/50 transition-all duration-500" style={{ width: `${prvPct}%` }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Severity config ──────────────────────────────────
+const SEV = {
+  info:     { Icon: Info,          borderClass: 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300' },
+  warning:  { Icon: AlertTriangle, borderClass: 'border-amber-500/20  bg-amber-500/10  text-amber-300'  },
+  critical: { Icon: Zap,           borderClass: 'border-red-500/20    bg-red-500/10    text-red-300'    },
+} as const;
+
+function LiveAlert({ alert, onDismiss }: { alert: AnalyticsAlertItem; onDismiss: (id: number) => void }) {
+  const { Icon, borderClass } = SEV[alert.severity] ?? SEV.info;
+  return (
+    <div className={`rounded-xl border p-4 text-sm flex items-start gap-3 ${borderClass}`} style={{ position: 'relative' }}>
+      <Icon className="h-4 w-4 shrink-0 mt-0.5" />
+      <div style={{ flex: 1 }}>
+        <span className="font-medium">{alert.message}</span>
+        {alert.detail && <p className="mt-1 opacity-75 text-xs">{alert.detail}</p>}
+      </div>
+      {!alert.is_read && (
+        <button
+          onClick={() => onDismiss(alert.id)}
+          title="إخفاء"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, padding: 2 }}
+          className="shrink-0"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
@@ -27,15 +110,30 @@ export default function OverviewTab({ dateRange }: { dateRange: DateRangeState }
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liveAlerts, setLiveAlerts] = useState<AnalyticsAlertItem[]>([]);
 
   useEffect(() => {
     setLoading(true);
     fetchOverview(dateRange).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [dateRange]);
 
+  useEffect(() => {
+    fetchAlerts(false)
+      .then((d) => setLiveAlerts(d.alerts.filter((a) => !a.is_read)))
+      .catch(() => {});
+  }, []);
+
+  const handleDismiss = (id: number) => {
+    markAlertRead(id).catch(() => {});
+    setLiveAlerts((prev) => prev.filter((a) => a.id !== id));
+  };
+
   if (loading) return <OverviewSkeleton />;
   if (error) return <p className="py-12 text-center text-red-400">Error: {error}</p>;
   if (!data) return null;
+
+  const staticAlerts = data.alerts ?? [];
+  const timeSeries = data.dailyTimeSeries || [];
 
   return (
     <section className="space-y-8">
@@ -46,7 +144,17 @@ export default function OverviewTab({ dateRange }: { dateRange: DateRangeState }
         </div>
       )}
 
-      {data.alerts.map((a, i) => (
+      {/* Live DB alerts */}
+      {liveAlerts.length > 0 && (
+        <div className="space-y-2">
+          {liveAlerts.slice(0, 5).map((a) => (
+            <LiveAlert key={a.id} alert={a} onDismiss={handleDismiss} />
+          ))}
+        </div>
+      )}
+
+      {/* Static overview alerts */}
+      {staticAlerts.map((a, i) => (
         <div key={i} className={`rounded-xl border p-4 text-sm flex items-center gap-2 ${
           a.severity === 'warning' ? 'border-red-500/20 bg-red-500/10 text-red-300' : 'border-indigo-500/20 bg-indigo-500/10 text-indigo-300'
         }`}>
@@ -54,11 +162,98 @@ export default function OverviewTab({ dateRange }: { dateRange: DateRangeState }
         </div>
       ))}
 
+      {/* ── KPI Grid with Visual Comparison ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={Eye} label="Total Reach" value={data.kpis.totalReach.toLocaleString()} trend={0} accent="#6366f1" />
-        <KpiCard icon={Heart} label="Total Engagement" value={data.kpis.totalEngagement.toLocaleString()} trend={0} accent="#f472b6" />
-        <KpiCard icon={Globe} label="Website Sessions" value={data.kpis.websiteSessions.toLocaleString()} trend={data.kpis.sessionsTrend} accent="#34d399" />
-        <KpiCard icon={Target} label="Conversions" value={data.kpis.conversions.toLocaleString()} trend={data.kpis.conversionsTrend} accent="#fb923c" />
+        <VisualKpiCard
+          icon={Eye}
+          label="Total Reach"
+          value={data.kpis.totalReach}
+          prevValue={data.kpis.prevTotalReach}
+          trend={0}
+          accent="#6366f1"
+        />
+        <VisualKpiCard
+          icon={Heart}
+          label="Total Engagement"
+          value={data.kpis.totalEngagement}
+          prevValue={data.kpis.prevTotalEngagement}
+          trend={0}
+          accent="#f472b6"
+        />
+        <VisualKpiCard
+          icon={Globe}
+          label="Website Sessions"
+          value={data.kpis.websiteSessions}
+          prevValue={data.kpis.prevWebsiteSessions}
+          trend={data.kpis.sessionsTrend}
+          accent="#34d399"
+        />
+        <VisualKpiCard
+          icon={Target}
+          label="Conversions"
+          value={data.kpis.conversions}
+          prevValue={data.kpis.prevConversions}
+          trend={data.kpis.conversionsTrend}
+          accent="#fb923c"
+        />
+      </div>
+
+      {/* ── Time-Series Line / Area Charts (Current vs Comparison) ── */}
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-md">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <GitCompare className="h-5 w-5 text-indigo-400" />
+            <h3 className="text-base font-semibold text-slate-100">
+              مقارنة الجلسات والوصول عبر الوقت (Sessions & Reach Comparison)
+            </h3>
+          </div>
+          <span className="text-xs text-slate-400 bg-white/[0.06] px-3 py-1 rounded-full border border-white/10">
+            {data.comparison?.compareTo === 'previous_year' ? 'مقارنة بالسنة السابقة' : 'مقارنة بالفترة السابقة'}
+          </span>
+        </div>
+
+        {timeSeries.length > 0 ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradSessionsCur" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#34d399" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="gradSessionsPrev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#64748b" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#64748b" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                <Area
+                  type="monotone"
+                  dataKey="sessions"
+                  name="الجلسات (الفترة الحالية)"
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fill="url(#gradSessionsCur)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="prevSessions"
+                  name="الجلسات (فترة المقارنة)"
+                  stroke="#64748b"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  fill="url(#gradSessionsPrev)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400 text-center py-10">لا توجد بيانات متسلسلة للرسم البياني في هذه الفترة</p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-md text-center">

@@ -1,23 +1,28 @@
 import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Newspaper, Globe, Settings, ChevronLeft,
-  ChevronRight, Home, Menu, X,
+  ChevronRight, Home, Menu, X, ShoppingBag, Package,
 } from 'lucide-react';
 import './AnalyticsDashboard.css';
 import DateRangePicker from './DateRangePicker';
 import { useDateRange } from './useDateRange';
 import OverviewTab from './OverviewTab';
+import SalesTab from './SalesTab';
+import ProductsTab from './ProductsTab';
 import MetaHubTab from './MetaHubTab';
 import ContentTab from './ContentTab';
 import WebAnalyticsTab from './WebAnalyticsTab';
 import SettingsTab from './SettingsTab';
 import ErrorBoundary from './ErrorBoundary';
+import NotificationCenter from './NotificationCenter';
 
-type TabKey = 'overview' | 'metahub' | 'content' | 'web' | 'settings';
+type TabKey = 'overview' | 'sales' | 'products' | 'metahub' | 'content' | 'web' | 'settings';
 type Theme = 'dark' | 'light';
 
 const navItems: { key: TabKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'sales', label: 'المبيعات', icon: ShoppingBag },
+  { key: 'products', label: 'المنتجات', icon: Package },
   { key: 'metahub', label: 'Meta Hub', icon: Users },
   { key: 'content', label: 'Content', icon: Newspaper },
   { key: 'web', label: 'Web Analytics', icon: Globe },
@@ -82,13 +87,26 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
               {navItems.find((n) => n.key === activeTab)?.label}
             </h1>
           </div>
-          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+            <NotificationCenter />
+          </div>
         </header>
 
         <div className="dashboard-content">
           {activeTab === 'overview' && (
             <ErrorBoundary tabLabel="Overview">
               <OverviewTab dateRange={dateRange} />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'sales' && (
+            <ErrorBoundary tabLabel="Sales">
+              <SalesTab />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'products' && (
+            <ErrorBoundary tabLabel="Products">
+              <ProductsTab dateRange={dateRange} />
             </ErrorBoundary>
           )}
           {activeTab === 'metahub' && (
@@ -103,7 +121,7 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
           )}
           {activeTab === 'web' && (
             <ErrorBoundary tabLabel="Web Analytics">
-              <WebAnalyticsTab />
+              <WebAnalyticsTab dateRange={dateRange} />
             </ErrorBoundary>
           )}
           {activeTab === 'settings' && (

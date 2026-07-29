@@ -1,9 +1,82 @@
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
+import {
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Legend,
+} from 'recharts';
+import { Eye, Heart, ArrowUpRight, ArrowDownRight, GitCompare } from 'lucide-react';
 import { fetchContent, type ContentData, type FacebookPost } from './api';
 import type { DateRangeState } from './useDateRange';
 import PostDrilldownModal from './PostDrilldownModal';
 import { ContentSkeleton } from './Skeletons';
+
+/* ── Visual Metric Card for Content ── */
+function VisualContentCard({
+  icon: Icon,
+  label,
+  value,
+  prevValue,
+  trend,
+  color,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: number;
+  prevValue?: number;
+  trend: number;
+  color: string;
+}) {
+  const isPositive = trend >= 0;
+  const cur = value || 0;
+  const prv = prevValue || 0;
+  const maxVal = Math.max(cur, prv, 1);
+  const curPct = Math.min(100, Math.round((cur / maxVal) * 100));
+  const prvPct = Math.min(100, Math.round((prv / maxVal) * 100));
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md transition-all hover:border-white/[0.14]">
+      <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl" style={{ background: color }} />
+
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 text-slate-400">
+          <Icon className="h-4 w-4 text-slate-300" />
+          <span className="text-xs font-medium">{label}</span>
+        </div>
+        <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-bold ${
+          isPositive ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+        }`}>
+          {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+          {isPositive ? '+' : ''}{trend}%
+        </span>
+      </div>
+
+      <p className="text-2xl font-bold tracking-tight text-slate-100 mb-3">
+        {cur.toLocaleString()}
+      </p>
+
+      {/* Visual comparison bar */}
+      <div className="space-y-1.5 pt-2 border-t border-white/[0.06]">
+        <div className="space-y-1">
+          <div className="flex justify-between text-[11px] text-slate-400">
+            <span>الفترة الحالية</span>
+            <span className="font-semibold text-slate-200">{cur.toLocaleString()}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${curPct}%`, background: color }} />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex justify-between text-[11px] text-slate-500">
+            <span>فترة المقارنة</span>
+            <span className="font-medium text-slate-400">{prv.toLocaleString()}</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="h-full rounded-full bg-slate-600/50 transition-all duration-500" style={{ width: `${prvPct}%` }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ContentTab({ dateRange }: { dateRange: DateRangeState }) {
   const [data, setData] = useState<ContentData | null>(null);
@@ -49,10 +122,71 @@ export default function ContentTab({ dateRange }: { dateRange: DateRangeState })
     );
   }
 
+  const metrics = data.metrics;
+  const dailySeries = data.dailySeries || [];
+
   return (
     <section className="space-y-8">
+      {/* Metric Cards if available */}
+      {metrics && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <VisualContentCard
+            icon={Eye}
+            label="وصول المنشورات (Total Reach)"
+            value={metrics.totalReach}
+            prevValue={metrics.prevTotalReach}
+            trend={metrics.reachTrend}
+            color="#6366f1"
+          />
+          <VisualContentCard
+            icon={Heart}
+            label="التفاعل الإجمالي (Total Engagement)"
+            value={metrics.totalEngagement}
+            prevValue={metrics.prevTotalEngagement}
+            trend={metrics.engagementTrend}
+            color="#f472b6"
+          />
+        </div>
+      )}
+
+      {/* ── Time-Series Line/Area Chart ── */}
+      {dailySeries.length > 0 && (
+        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-6 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-slate-300">مقارنة الوصول اليومي للمحتوى (Daily Reach Comparison)</h3>
+            <span className="text-xs text-slate-400 bg-white/[0.06] px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-1">
+              <GitCompare size={12} className="text-amber-400" /> مقارنة الفترات
+            </span>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailySeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="contentReachCur" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                  </linearGradient>
+                  <linearGradient id="contentReachPrev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#64748b" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#64748b" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Area type="monotone" dataKey="reach" name="الوصول (الفترة الحالية)" stroke="#6366f1" strokeWidth={2} fill="url(#contentReachCur)" />
+                <Area type="monotone" dataKey="prevReach" name="الوصول (فترة المقارنة)" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 4" fill="url(#contentReachPrev)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Bar Chart comparing reach by post type */}
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 backdrop-blur-md">
-        <h3 className="mb-4 text-sm font-medium text-slate-300">Reach by post type</h3>
+        <h3 className="mb-4 text-sm font-medium text-slate-300">الوصول حسب نوع المنشور (Reach by Post Type)</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data.byPostType}>
@@ -60,7 +194,9 @@ export default function ContentTab({ dateRange }: { dateRange: DateRangeState })
               <XAxis dataKey="type" tick={{ fill: '#94a3b8', fontSize: 12 }} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="reach" fill="#6366f1" radius={[6, 6, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+              <Bar dataKey="reach" name="الفترة الحالية" fill="#6366f1" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="prevReach" name="فترة المقارنة" fill="#475569" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

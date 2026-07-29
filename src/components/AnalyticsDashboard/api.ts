@@ -71,15 +71,36 @@ async function apiPost<T>(path: string, body: Record<string, unknown> = {}): Pro
   });
 }
 
-export type DateRangeParams = { range: string; start?: string; end?: string };
+export type DateRangeParams = { range: string; start?: string; end?: string; compareTo?: string };
+
+function formatDateRangeParams(r: DateRangeParams): Record<string, string> {
+  const p: Record<string, string> = { range: r.range };
+  if (r.start) p.start = r.start;
+  if (r.end) p.end = r.end;
+  if (r.compareTo) p.compare_to = r.compareTo;
+  return p;
+}
 
 // ─── Overview Tab ───────────────────────────────────
+export type DailyTimeSeriesItem = {
+  date: string;
+  sessions: number;
+  prevSessions: number;
+  reach: number;
+  prevReach: number;
+  conversions: number;
+  prevConversions: number;
+};
+
 export type OverviewData = {
   kpis: {
-    totalReach: number; totalEngagement: number;
-    websiteSessions: number; sessionsTrend: number;
-    conversions: number; conversionsTrend: number;
+    totalReach: number; prevTotalReach?: number;
+    totalEngagement: number; prevTotalEngagement?: number;
+    websiteSessions: number; prevWebsiteSessions?: number; sessionsTrend: number;
+    conversions: number; prevConversions?: number; conversionsTrend: number;
   };
+  comparison?: { compareTo: string; prevStart: string; prevEnd: string };
+  dailyTimeSeries?: DailyTimeSeriesItem[];
   contentToTrafficScore: number;
   alerts: { severity: "warning" | "info"; message: string }[];
   isMetaConnected: boolean;
@@ -107,9 +128,14 @@ export type FacebookPost = {
 
 export type ContentData = {
   posts: FacebookPost[];
-  byPostType: { type: string; reach: number; count: number }[];
+  byPostType: { type: string; reach: number; count: number; prevReach?: number }[];
+  metrics?: {
+    totalReach: number; prevTotalReach: number; reachTrend: number;
+    totalEngagement: number; prevTotalEngagement: number; engagementTrend: number;
+  };
+  dailySeries?: { date: string; reach: number; prevReach: number }[];
+  missingData?: { key: string; label: string; reason: string }[];
 };
-
 
 // ─── Drilldown ──────────────────────────────────────
 export type DrilldownData = {
@@ -141,7 +167,7 @@ export type MetaHubData = {
   topPosts: TopPost[]; meta_error?: string;
 };
 
-// ─── Web Analytics Tab (new) ────────────────────────
+// ─── Web Analytics Tab ──────────────────────────────
 export type TopPage = {
   name: string; page: string; views: number; uniqueVisitors: number;
   bounceRate: number; avgDuration: string;
@@ -149,11 +175,14 @@ export type TopPage = {
 
 export type WebAnalyticsData = {
   metrics: {
-    bounceRate: number; bounceRateTrend: number;
-    avgSessionDuration: string; avgSessionDurationTrend: number;
-    totalSessions: number; totalSessionsTrend: number;
+    bounceRate: number; prevBounceRate?: number; bounceRateTrend: number;
+    avgSessionDuration: string; prevAvgSessionDuration?: string; avgSessionDurationTrend: number;
+    totalSessions: number; prevTotalSessions?: number; totalSessionsTrend: number;
   };
+  comparison?: { compareTo: string; prevStart: string; prevEnd: string };
+  dailySeries?: { date: string; sessions: number; prevSessions: number; bounceRate: number; prevBounceRate: number }[];
   topPages: TopPage[];
+  trafficSources?: { name: string; nameAr: string; value: number; color: string }[];
   bounceRateSparkline: { v: number }[];
   sessionDurationSparkline: { v: number }[];
   totalSessionsSparkline: { v: number }[];
@@ -173,16 +202,96 @@ export type AnalyticsSettings = {
 export type AnalyticsSettingsData = AnalyticsSettings;
 
 // ─── API calls ──────────────────────────────────────
-export const fetchOverview       = (r: DateRangeParams) => apiFetch<OverviewData>("analytics/overview/", r as Record<string, string>);
-export const fetchAudience       = (r: DateRangeParams) => apiFetch<AudienceData>("analytics/audience/", r as Record<string, string>);
-export const fetchContent        = (r: DateRangeParams) => apiFetch<ContentData>("analytics/content/", r as Record<string, string>);
+export const fetchOverview       = (r: DateRangeParams) => apiFetch<OverviewData>("analytics/overview/", formatDateRangeParams(r));
+export const fetchAudience       = (r: DateRangeParams) => apiFetch<AudienceData>("analytics/audience/", formatDateRangeParams(r));
+export const fetchContent        = (r: DateRangeParams) => apiFetch<ContentData>("analytics/content/", formatDateRangeParams(r));
 export const fetchDrilldown      = (postId: string)     => apiFetch<DrilldownData>(`analytics/posts/${postId}/drilldown/`);
 
-// These match the ACTUAL backend URLs:
 export const fetchMetaHub        = ()                   => apiFetch<MetaHubData>("analytics/meta/");
-export const fetchWebAnalytics   = ()                   => apiFetch<WebAnalyticsData>("analytics/web/");
+export const fetchWebAnalytics   = (r?: DateRangeParams) => apiFetch<WebAnalyticsData>("analytics/web/", r ? formatDateRangeParams(r) : undefined);
 export const fetchAnalyticsSettings = ()                => apiFetch<AnalyticsSettings>("analytics/settings/");
 export const updateAnalyticsSettings = (data: Record<string, unknown>) => apiPost<{ message: string }>("analytics/settings/", data);
 export const syncNow             = ()                   => apiPost<{ message: string; results: Record<string, unknown> }>("analytics/sync-now/");
 export const syncMetaData        = ()                   => apiPost<{ message: string; data?: Record<string, unknown> }>("analytics/sync-now/");
 export const startMetaOAuth      = ()                   => apiFetch<{ oauth_url: string }>("analytics/meta/oauth/start/");
+
+// ─── Product Analytics Tab ──────────────────────────
+export type TopProductItem = {
+  id: string;
+  title: string;
+  slug: string;
+  category_name: string;
+  primary_image: string | null;
+  price: number;
+  views: number;
+  cart_adds: number;
+  orders: number;
+  revenue: number;
+  conversion_rate: number;
+};
+
+export type CategoryPerformanceItem = {
+  id: number;
+  name: string;
+  slug: string;
+  products_count: number;
+  views: number;
+  orders: number;
+  revenue: number;
+};
+
+export type UnderperformingProductItem = {
+  id: string;
+  title: string;
+  slug: string;
+  category_name: string;
+  primary_image: string | null;
+  price: number;
+  views: number;
+  orders: number;
+  conversion_rate: number;
+  reason: string;
+};
+
+export const fetchTopProducts          = (r?: DateRangeParams) => apiFetch<{ products: TopProductItem[] }>("analytics/products/top/", r as Record<string, string>);
+export const fetchCategoryPerformance = (r?: DateRangeParams) => apiFetch<{ categories: CategoryPerformanceItem[] }>("analytics/products/categories/", r as Record<string, string>);
+export const fetchUnderperformingProducts = (r?: DateRangeParams) => apiFetch<{ products: UnderperformingProductItem[] }>("analytics/products/underperforming/", r as Record<string, string>);
+
+export type FavoriteAnalyticsItem = {
+  product_id: string;
+  product_title: string;
+  product_slug: string;
+  product_price: number;
+  primary_image: string | null;
+  favorites_count: number;
+  converted_count: number;
+  conversion_rate: number;
+};
+
+export const fetchFavoritesAnalytics = () => apiFetch<{ favorites: FavoriteAnalyticsItem[] }>("analytics/favorites/");
+
+// ─── Analytics Alerts ────────────────────────────────
+export type AnalyticsAlertItem = {
+  id: number;
+  alert_type: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  detail: string;
+  is_read: boolean;
+  created_at: string;
+  read_at: string | null;
+  threshold_pct: number | null;
+  actual_value: number | null;
+  previous_value: number | null;
+};
+
+export type AlertsResponse = {
+  alerts: AnalyticsAlertItem[];
+  unread_count: number;
+  total_count: number;
+};
+
+export const fetchAlerts        = (unreadOnly = false) => apiFetch<AlertsResponse>(`analytics/alerts/${unreadOnly ? '?unread_only=1' : ''}`);
+export const markAlertRead      = (id: number)         => apiPost<{ ok: boolean; id: number }>(`analytics/alerts/${id}/read/`);
+export const markAllAlertsRead  = ()                   => apiPost<{ ok: boolean; marked_read: number }>('analytics/alerts/read-all/');
+export const triggerAlerts      = ()                   => apiPost<{ ok: boolean; fired: string[]; count: number; message: string }>('analytics/alerts/trigger/');
