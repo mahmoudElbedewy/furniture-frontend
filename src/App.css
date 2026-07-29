@@ -4189,7 +4189,7 @@ button {
   display: flex; align-items: center; justify-content: center; z-index: 999;
 }
 .policy-modal {
-  background: var(--panel); padding: 24px; max-width: 420px; width: 90%;
+  background: var(--panel); padding: 24px; max-width: 420px; width: 90%;max-height: 85vh;     overflow-y: auto;
 }
 .policy-actions { display: flex; gap: 12px; margin-top: 16px; }
 .policy-reject { flex: 1; background: transparent; border: 1px solid var(--line); padding: 10px; }

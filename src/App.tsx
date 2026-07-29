@@ -1587,7 +1587,7 @@ const selectProductSize = (product: Product, variant: ProductVariant) => {
 };
 const openCheckout = () => {
   trackFunnelEvent('checkout_start');
-  openCheckout();
+  setCheckoutOpen(true);
 };
 
 const addItemToCart = (
@@ -4061,7 +4061,7 @@ const addItemToCart = (
             <h3>سلتك</h3>
             <div className="checkout-cart-list">
               {cart.map((item) => (
-                <div className="checkout-cart-item" key={item.product.id}>
+                <div className="checkout-cart-item" key={cartItemKey(item.product, item.selectedVariant)}>
                   <div className="checkout-item-details">
                     <div className="checkout-item-header">
                       <strong>
@@ -4269,7 +4269,7 @@ const addItemToCart = (
             <>
               <div className="cart-list">
                 {cart.map((item) => (
-                  <div className="cart-row" key={item.product.id}>
+                  <div className="cart-row" key={cartItemKey(item.product, item.selectedVariant)}>
                     <div>
                     <strong>{item.product.title}</strong>
                     {item.selectedVariant && <small className="variant-badge">{item.selectedVariant.size_name}</small>}
