@@ -81,11 +81,15 @@ export default function SettingsTab({
     if (!oauthResult) return;
 
     if (oauthResult === 'success') {
-      setSuccess('تم ربط فيسبوك تلقائيًا بنجاح ✅');
+      setSuccess('تم ربط فيسبوك تلقائيًا بنجاح ومزامنة البيانات حياً ✅');
       fetchAnalyticsSettings().then((d: any) => {
+        setData(d);
         setMetaConnected(d.is_meta_connected ?? true);
         setFbPageId(d.fb_page_id || '');
+        setFbFollowers(d.fb_followers_override || 0);
+        setFbReach(d.fb_reach_override || 0);
         setAccessToken(d.meta_access_token || '');
+        setLastSync(d.last_meta_sync || null);
       }).catch(() => {});
     } else {
       setError(`فشل ربط فيسبوك: ${params.get('reason') || 'خطأ غير معروف'}`);
