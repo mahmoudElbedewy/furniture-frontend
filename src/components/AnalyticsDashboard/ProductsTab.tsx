@@ -33,7 +33,13 @@ const money = (value?: string | number | null) => {
 
 const CATEGORY_COLORS = ["#d3b16c", "#6366f1", "#34d399", "#f472b6", "#fb923c", "#a855f7"];
 
-export default function ProductsTab({ dateRange }: { dateRange?: DateRangeParams }) {
+export default function ProductsTab({
+  dateRange,
+  focusedProductSlug,
+}: {
+  dateRange?: DateRangeParams;
+  focusedProductSlug?: string | null;
+}) {
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
   const [categories, setCategories] = useState<CategoryPerformanceItem[]>([]);
   const [underperforming, setUnderperforming] = useState<UnderperformingProductItem[]>([]);
@@ -107,7 +113,14 @@ export default function ProductsTab({ dateRange }: { dateRange?: DateRangeParams
               </thead>
               <tbody>
                 {topProducts.map((p) => (
-                  <tr key={p.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <tr
+                    key={p.id}
+                    style={{
+                      borderBottom: "1px solid var(--line)",
+                      background: focusedProductSlug === p.slug ? "rgba(211, 177, 108, 0.14)" : undefined,
+                      outline: focusedProductSlug === p.slug ? "1px solid rgba(211, 177, 108, 0.45)" : undefined,
+                    }}
+                  >
                     <td style={{ padding: "12px 8px", display: "flex", alignItems: "center", gap: 10 }}>
                       {p.primary_image ? (
                         <img
@@ -232,9 +245,9 @@ export default function ProductsTab({ dateRange }: { dateRange?: DateRangeParams
                   flexDirection: "column",
                   gap: 10,
                   padding: 16,
-                  border: "1px solid var(--line)",
+                  border: focusedProductSlug === p.slug ? "1px solid rgba(211, 177, 108, 0.55)" : "1px solid var(--line)",
                   borderRadius: "var(--radius-card)",
-                  background: "var(--bg)",
+                  background: focusedProductSlug === p.slug ? "rgba(211, 177, 108, 0.12)" : "var(--bg)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -320,9 +333,9 @@ export default function ProductsTab({ dateRange }: { dateRange?: DateRangeParams
                   flexDirection: "column",
                   gap: 10,
                   padding: 16,
-                  border: "1px solid var(--line)",
+                  border: focusedProductSlug === p.product_slug ? "1px solid rgba(211, 177, 108, 0.55)" : "1px solid var(--line)",
                   borderRadius: "var(--radius-card)",
-                  background: "var(--bg)",
+                  background: focusedProductSlug === p.product_slug ? "rgba(211, 177, 108, 0.12)" : "var(--bg)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -384,4 +397,3 @@ export default function ProductsTab({ dateRange }: { dateRange?: DateRangeParams
     </div>
   );
 }
-

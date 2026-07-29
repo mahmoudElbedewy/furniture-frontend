@@ -110,6 +110,18 @@ export default function ContentTab({ dateRange }: { dateRange: DateRangeState })
             <li>التأكد من إدخال <strong className="text-slate-200">Page ID</strong> الصحيح</li>
             <li>الضغط على <strong className="text-slate-200">مزامنة الآن</strong> في صفحة الإعدادات</li>
           </ol>
+          <div className="mx-auto grid max-w-lg gap-2 text-right sm:grid-cols-3">
+            {[
+              'افتح Settings وأكمل بيانات Meta',
+              'شغل المزامنة وانتظر انتهاءها',
+              'ارجع هنا وغيّر الفترة إذا لزم',
+            ].map((step, index) => (
+              <div key={step} className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3 text-xs text-slate-300">
+                <span className="mb-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-400/10 text-amber-200">{index + 1}</span>
+                <p className="m-0 leading-relaxed">{step}</p>
+              </div>
+            ))}
+          </div>
           {data.missingData && data.missingData.length > 0 && (
             <div className="mt-4 rounded-lg bg-white/[0.04] border border-white/[0.08] p-3">
               {data.missingData.map((m: { key: string; label: string; reason: string }) => (

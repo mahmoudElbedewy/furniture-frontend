@@ -270,7 +270,63 @@ export type FavoriteAnalyticsItem = {
 
 export const fetchFavoritesAnalytics = () => apiFetch<{ favorites: FavoriteAnalyticsItem[] }>("analytics/favorites/");
 
+export type RealtimeAnalyticsData = {
+  currentVisitors: number;
+  source: "ga4" | "site";
+  available: boolean;
+  fallbackVisitors: number;
+  windowMinutes: number;
+  reason: string | null;
+};
+
+export type CustomerLTVItem = {
+  id: string;
+  email: string;
+  fullName: string;
+  phoneNumber: string;
+  lifetimeValue: number;
+  orderCount: number;
+  avgOrderValue: number;
+  lastOrderAt: string | null;
+};
+
+export type CustomerLTVResponse = {
+  customers: CustomerLTVItem[];
+  summary: {
+    registeredCustomers: number;
+    totalLifetimeValue: number;
+    totalOrders: number;
+    avgOrderValue: number;
+  };
+};
+
+export const fetchRealtimeAnalytics = () => apiFetch<RealtimeAnalyticsData>("analytics/realtime/");
+export const fetchCustomersLTV = () => apiFetch<CustomerLTVResponse>("analytics/customers/ltv/");
+
 // ─── Analytics Alerts ────────────────────────────────
+export type SearchAnalyticsTerm = {
+  query: string;
+  searchCount: number;
+  totalResults: number;
+  avgResults: number;
+  lastSearchedAt: string | null;
+};
+
+export type SearchAnalyticsResponse = {
+  topNoResults: SearchAnalyticsTerm[];
+  topSuccessful: SearchAnalyticsTerm[];
+  summary: {
+    totalSearches: number;
+    uniqueQueries: number;
+    zeroResultSearches: number;
+    successfulSearches: number;
+    zeroResultRate: number;
+  };
+};
+
+export const fetchSearchAnalytics = (r?: DateRangeParams) =>
+  apiFetch<SearchAnalyticsResponse>("analytics/search/", r ? formatDateRangeParams(r) : undefined);
+
 export type AnalyticsAlertItem = {
   id: number;
   alert_type: string;

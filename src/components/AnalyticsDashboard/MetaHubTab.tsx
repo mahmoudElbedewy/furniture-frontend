@@ -62,7 +62,7 @@ export default function MetaHubTab() {
     return (
       <section className="space-y-6">
         <h2 className="text-lg font-semibold text-slate-100">مركز ميتا</h2>
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-8 backdrop-blur-md text-center space-y-4">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-8 backdrop-blur-md text-center space-y-5">
           <div className="mx-auto h-16 w-16 rounded-full bg-amber-500/10 flex items-center justify-center">
             <span className="text-3xl">🔗</span>
           </div>
@@ -70,11 +70,19 @@ export default function MetaHubTab() {
           <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
             هذا التبويب يعرض بيانات صفحة فيسبوك وإنستجرام الحقيقية بعد الربط والمزامنة.
           </p>
-          <ol className="text-sm text-slate-400 list-decimal list-inside space-y-1.5 max-w-md mx-auto text-right">
-            <li>اذهب لتبويب <strong className="text-slate-200">الإعدادات</strong></li>
-            <li>أدخل <strong className="text-slate-200">Access Token</strong> صالح و <strong className="text-slate-200">Page ID</strong></li>
-            <li>اضغط <strong className="text-slate-200">مزامنة الآن</strong></li>
-          </ol>
+
+          <div className="mx-auto grid max-w-lg gap-3 text-right sm:grid-cols-3">
+            {[
+              'افتح الإعدادات والتكامل',
+              'أدخل Access Token و Page ID',
+              'اضغط مزامنة الآن لربط البيانات',
+            ].map((step, index) => (
+              <div key={step} className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-3.5 text-xs text-slate-300">
+                <span className="mb-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-400/20 text-amber-300 font-bold">{index + 1}</span>
+                <p className="m-0 leading-relaxed font-medium">{step}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     );
