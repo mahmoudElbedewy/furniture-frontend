@@ -7,37 +7,68 @@ const getAuthHeaders = (): Record<string, string> => {
     : { "Content-Type": "application/json" };
 };
 
-async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const query = params ? `?${new URLSearchParams(params).toString()}` : "";
-  const res = await fetch(`${API_BASE_URL}/api/admin/${path}${query}`, { headers: getAuthHeaders() });
-  if (!res.ok) {
-    try {
-      const errData = await res.json();
-      const msg = errData.error || errData.message || errData.detail;
-      if (msg) throw new Error(msg);
-    } catch (e: any) {
-      if (e.message && !e.message.startsWith("API error ")) throw e;
-    }
-    throw new Error(`API error ${res.status}`);
+class ApiError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.status = status;
   }
-  return res.json();
+}
+
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 600;
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isRetryable(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status !== undefined && RETRYABLE_STATUS_CODES.has(error.status);
+  }
+  return error instanceof TypeError;
+}
+
+async function withRetry<T>(attempt: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i <= MAX_RETRIES; i++) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+      if (i === MAX_RETRIES || !isRetryable(error)) throw error;
+      await sleep(RETRY_BASE_DELAY_MS * 2 ** i);
+    }
+  }
+  throw lastError;
+}
+
+async function parseErrorResponse(res: Response): Promise<ApiError> {
+  try {
+    const errData = await res.json();
+    const msg = errData.error || errData.message || errData.detail;
+    if (msg) return new ApiError(msg, res.status);
+  } catch {
+  }
+  return new ApiError(`API error ${res.status}`, res.status);
+}
+
+async function apiFetch<T>(path: string, params?: Record<string, string>): Promise<T> {
+  return withRetry(async () => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : "";
+    const res = await fetch(`${API_BASE_URL}/api/admin/${path}${query}`, { headers: getAuthHeaders() });
+    if (!res.ok) throw await parseErrorResponse(res);
+    return res.json();
+  });
 }
 
 async function apiPost<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}/api/admin/${path}`, {
-    method: "POST", headers: getAuthHeaders(), body: JSON.stringify(body),
+  return withRetry(async () => {
+    const res = await fetch(`${API_BASE_URL}/api/admin/${path}`, {
+      method: "POST", headers: getAuthHeaders(), body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await parseErrorResponse(res);
+    return res.json();
   });
-  if (!res.ok) {
-    try {
-      const errData = await res.json();
-      const msg = errData.error || errData.message || errData.detail;
-      if (msg) throw new Error(msg);
-    } catch (e: any) {
-      if (e.message && !e.message.startsWith("API error ")) throw e;
-    }
-    throw new Error(`API error ${res.status}`);
-  }
-  return res.json();
 }
 
 export type DateRangeParams = { range: string; start?: string; end?: string };
@@ -79,12 +110,6 @@ export type ContentData = {
   byPostType: { type: string; reach: number; count: number }[];
 };
 
-// ─── Web Traffic Tab (old) ──────────────────────────
-export type WebTrafficData = {
-  metrics: { totalSessions: number; bounceRate: number; avgSessionDuration: string };
-  dailyTrend: { date: string; sessions: number }[];
-  topPages: { name: string; views: number; uniqueVisitors: number; bounceRate: number; avgDuration: string }[];
-};
 
 // ─── Drilldown ──────────────────────────────────────
 export type DrilldownData = {
@@ -151,7 +176,6 @@ export type AnalyticsSettingsData = AnalyticsSettings;
 export const fetchOverview       = (r: DateRangeParams) => apiFetch<OverviewData>("analytics/overview/", r as Record<string, string>);
 export const fetchAudience       = (r: DateRangeParams) => apiFetch<AudienceData>("analytics/audience/", r as Record<string, string>);
 export const fetchContent        = (r: DateRangeParams) => apiFetch<ContentData>("analytics/content/", r as Record<string, string>);
-export const fetchWebTraffic     = (r: DateRangeParams) => apiFetch<WebTrafficData>("analytics/web-traffic/", r as Record<string, string>);
 export const fetchDrilldown      = (postId: string)     => apiFetch<DrilldownData>(`analytics/posts/${postId}/drilldown/`);
 
 // These match the ACTUAL backend URLs:
@@ -161,3 +185,4 @@ export const fetchAnalyticsSettings = ()                => apiFetch<AnalyticsSet
 export const updateAnalyticsSettings = (data: Record<string, unknown>) => apiPost<{ message: string }>("analytics/settings/", data);
 export const syncNow             = ()                   => apiPost<{ message: string; results: Record<string, unknown> }>("analytics/sync-now/");
 export const syncMetaData        = ()                   => apiPost<{ message: string; data?: Record<string, unknown> }>("analytics/sync-now/");
+export const startMetaOAuth      = ()                   => apiFetch<{ oauth_url: string }>("analytics/meta/oauth/start/");

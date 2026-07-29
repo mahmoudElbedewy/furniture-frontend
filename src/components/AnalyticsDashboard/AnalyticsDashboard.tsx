@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, Users, Newspaper, Globe, Settings, ChevronLeft,
   ChevronRight, Home, Menu, X,
@@ -11,8 +11,10 @@ import MetaHubTab from './MetaHubTab';
 import ContentTab from './ContentTab';
 import WebAnalyticsTab from './WebAnalyticsTab';
 import SettingsTab from './SettingsTab';
+import ErrorBoundary from './ErrorBoundary';
 
 type TabKey = 'overview' | 'metahub' | 'content' | 'web' | 'settings';
+type Theme = 'dark' | 'light';
 
 const navItems: { key: TabKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -27,11 +29,18 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dateRange, setDateRange] = useDateRange();
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem('analytics_theme') as Theme) || 'dark',
+  );
+
+  useEffect(() => {
+    localStorage.setItem('analytics_theme', theme);
+  }, [theme]);
 
   const handleBack = () => (onBack ? onBack() : (window.location.hash = '#catalog'));
 
   return (
-    <div className="analytics-dashboard" dir="ltr">
+    <div className={`analytics-dashboard ${theme === 'light' ? 'theme-light' : ''}`} dir="ltr">
       {mobileOpen && <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} role="presentation" />}
 
       <aside className={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-mobile-open' : ''}`}>
@@ -77,11 +86,31 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
         </header>
 
         <div className="dashboard-content">
-          {activeTab === 'overview' && <OverviewTab dateRange={dateRange} />}
-          {activeTab === 'metahub' && <MetaHubTab />}
-          {activeTab === 'content' && <ContentTab dateRange={dateRange} />}
-          {activeTab === 'web' && <WebAnalyticsTab />}
-          {activeTab === 'settings' && <SettingsTab />}
+          {activeTab === 'overview' && (
+            <ErrorBoundary tabLabel="Overview">
+              <OverviewTab dateRange={dateRange} />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'metahub' && (
+            <ErrorBoundary tabLabel="Meta Hub">
+              <MetaHubTab />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'content' && (
+            <ErrorBoundary tabLabel="Content">
+              <ContentTab dateRange={dateRange} />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'web' && (
+            <ErrorBoundary tabLabel="Web Analytics">
+              <WebAnalyticsTab />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'settings' && (
+            <ErrorBoundary tabLabel="Settings">
+              <SettingsTab theme={theme} onThemeChange={setTheme} />
+            </ErrorBoundary>
+          )}
         </div>
       </main>
 

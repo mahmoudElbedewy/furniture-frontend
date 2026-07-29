@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { fetchContent, type ContentData, type FacebookPost } from './api';
 import type { DateRangeState } from './useDateRange';
 import PostDrilldownModal from './PostDrilldownModal';
+import { ContentSkeleton } from './Skeletons';
 
 export default function ContentTab({ dateRange }: { dateRange: DateRangeState }) {
   const [data, setData] = useState<ContentData | null>(null);
@@ -15,7 +16,7 @@ export default function ContentTab({ dateRange }: { dateRange: DateRangeState })
     fetchContent(dateRange).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [dateRange]);
 
-  if (loading) return <div className="py-20 text-center text-slate-400">Loading content…</div>;
+  if (loading) return <ContentSkeleton />;
   if (error) return <p className="py-12 text-center text-red-400">Error: {error}</p>;
   if (!data) return null;
 

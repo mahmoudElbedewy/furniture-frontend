@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Eye, Heart, Globe, Target, AlertTriangle } from 'lucide-react';
 import { fetchOverview, type OverviewData } from './api';
+import { OverviewSkeleton } from './Skeletons';
 import type { DateRangeState } from './useDateRange';
 
 function KpiCard({ icon: Icon, label, value, trend, accent }: {
@@ -32,7 +33,7 @@ export default function OverviewTab({ dateRange }: { dateRange: DateRangeState }
     fetchOverview(dateRange).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [dateRange]);
 
-  if (loading) return <div className="py-20 text-center text-slate-400">Loading overview…</div>;
+  if (loading) return <OverviewSkeleton />;
   if (error) return <p className="py-12 text-center text-red-400">Error: {error}</p>;
   if (!data) return null;
 

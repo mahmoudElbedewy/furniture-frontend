@@ -611,3 +611,106 @@
   overflow: hidden;
 }
 
+.analytics-dashboard.theme-light {
+  --dash-bg-from: #f4f5f7;
+  --dash-bg-to: #ffffff;
+  --dash-glass: rgba(15, 23, 42, 0.03);
+  --dash-glass-hover: rgba(15, 23, 42, 0.06);
+  --dash-glass-border: rgba(15, 23, 42, 0.08);
+  --dash-glass-border-hover: rgba(15, 23, 42, 0.16);
+  --dash-text: #1e293b;
+  --dash-text-muted: #64748b;
+}
+
+.analytics-dashboard.theme-light .sidebar {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(248, 250, 252, 0.98) 100%
+  );
+}
+
+.analytics-dashboard.theme-light .dashboard-topbar {
+  background: linear-gradient(
+    180deg,
+    rgba(244, 245, 247, 0.92) 0%,
+    rgba(244, 245, 247, 0) 100%
+  );
+}
+
+.analytics-dashboard.theme-light .sidebar-logo-text,
+.analytics-dashboard.theme-light .sidebar-user-name {
+  color: var(--dash-text);
+}
+
+.analytics-dashboard.theme-light .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-color: var(--dash-glass-border) !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12) !important;
+}
+
+.analytics-dashboard.theme-light .recharts-tooltip-wrapper .recharts-tooltip-label {
+  color: var(--dash-text) !important;
+}
+
+.analytics-dashboard.theme-light .recharts-tooltip-wrapper .recharts-tooltip-item {
+  color: var(--dash-text-muted) !important;
+}
+
+.analytics-dashboard.theme-light .recharts-tooltip-wrapper .recharts-tooltip-item-value {
+  color: var(--dash-text) !important;
+}
+
+/* ─── Recolor hardcoded Tailwind dark utilities used inside every tab ─── */
+.analytics-dashboard.theme-light .text-slate-100,
+.analytics-dashboard.theme-light .text-slate-200 {
+  color: #1e293b;
+}
+
+.analytics-dashboard.theme-light .text-slate-300 {
+  color: #475569;
+}
+
+.analytics-dashboard.theme-light .text-slate-400 {
+  color: #64748b;
+}
+
+.analytics-dashboard.theme-light .text-slate-500 {
+  color: #94a3b8;
+}
+
+.analytics-dashboard.theme-light .bg-white\/\[0\.02\],
+.analytics-dashboard.theme-light .bg-white\/\[0\.03\],
+.analytics-dashboard.theme-light .bg-white\/\[0\.04\] {
+  background-color: rgba(15, 23, 42, 0.035) !important;
+}
+
+.analytics-dashboard.theme-light .bg-white\/\[0\.06\] {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+.analytics-dashboard.theme-light .border-white\/\[0\.06\] {
+  border-color: rgba(15, 23, 42, 0.07) !important;
+}
+
+.analytics-dashboard.theme-light .border-white\/\[0\.08\] {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+.analytics-dashboard.theme-light .border-white\/\[0\.14\] {
+  border-color: rgba(15, 23, 42, 0.18) !important;
+}
+
+.analytics-dashboard.theme-light input,
+.analytics-dashboard.theme-light textarea {
+  color: #1e293b;
+}
+
+.analytics-dashboard.theme-light input::placeholder,
+.analytics-dashboard.theme-light textarea::placeholder {
+  color: #94a3b8;
+}
+
+.analytics-dashboard.theme-light .bg-\[\#131824\] {
+  background-color: #ffffff !important;
+}

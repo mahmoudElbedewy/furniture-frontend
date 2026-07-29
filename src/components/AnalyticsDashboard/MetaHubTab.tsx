@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import { Users, Eye, TrendingUp, ThumbsUp, MessageSquare, Share2 } from 'lucide-react';
 import { fetchMetaHub, type MetaHubData, type TopPost } from './api';
+import { MetaHubSkeleton } from './Skeletons';
 
 const formatNum = (n: number | null | undefined) => typeof n === 'number' ? n.toLocaleString('en-US') : '0';
 
@@ -50,12 +51,7 @@ export default function MetaHubTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-      <span className="mr-3 text-slate-400">جاري تحميل بيانات ميتا...</span>
-    </div>
-  );
+  if (loading) return <MetaHubSkeleton />;
   if (error) return <p className="py-12 text-center text-red-400">خطأ: {error}</p>;
   if (!data) return null;
 

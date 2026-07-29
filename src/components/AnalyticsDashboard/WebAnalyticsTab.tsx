@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { Clock, MousePointerClick, ArrowUpRight, Globe } from 'lucide-react';
 import { fetchWebAnalytics, type WebAnalyticsData, type TopPage } from './api';
+import { WebAnalyticsSkeleton } from './Skeletons';
 
 /* ── Sparkline ───────────────────────────────────────── */
 function Sparkline({ data, color }: { data: { v: number }[]; color: string }) {
@@ -71,12 +72,7 @@ export default function WebAnalyticsTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-      <span className="mr-3 text-slate-400">جاري تحميل البيانات...</span>
-    </div>
-  );
+  if (loading) return <WebAnalyticsSkeleton />;
   if (error) return <p className="py-12 text-center text-red-400">خطأ: {error}</p>;
   if (!data) return null;
 

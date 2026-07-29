@@ -4,16 +4,24 @@ import {
   ToggleLeft, ToggleRight, RefreshCw,
   Shield, Mail, User, Save,
 } from 'lucide-react';
-import { fetchAnalyticsSettings, updateAnalyticsSettings, syncMetaData, type AnalyticsSettingsData } from './api';
+import { fetchAnalyticsSettings, updateAnalyticsSettings, syncMetaData, startMetaOAuth, type AnalyticsSettingsData } from './api';
+import { SettingsSkeleton } from './Skeletons';
 
-export default function SettingsTab() {
+type Theme = 'dark' | 'light';
+
+export default function SettingsTab({
+  theme,
+  onThemeChange,
+}: {
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+}) {
   const [data, setData] = useState<AnalyticsSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(true);
-
+  const darkMode = theme === 'dark';
   // Meta Editable fields
   const [fbUrl, setFbUrl] = useState('');
   const [fbPageId, setFbPageId] = useState('');
@@ -25,11 +33,24 @@ export default function SettingsTab() {
   const [accessToken, setAccessToken] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [connectingOAuth, setConnectingOAuth] = useState(false);
 
   // GA4 Editable fields (الجديدة)
   const [googleConnected, setGoogleConnected] = useState(false);
   const [ga4PropertyId, setGa4PropertyId] = useState('');
   const [ga4ServiceAccountJson, setGa4ServiceAccountJson] = useState('');
+
+  const handleConnectFacebook = async () => {
+  setConnectingOAuth(true);
+  setError(null);
+  try {
+    const { oauth_url } = await startMetaOAuth();
+    window.location.href = oauth_url;
+  } catch (e: unknown) {
+    setError(e instanceof Error ? e.message : 'تعذر بدء الربط التلقائي');
+    setConnectingOAuth(false);
+  }
+};
 
   useEffect(() => {
     fetchAnalyticsSettings()
@@ -52,6 +73,32 @@ export default function SettingsTab() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthResult = params.get('meta_oauth');
+    if (!oauthResult) return;
+
+    if (oauthResult === 'success') {
+      setSuccess('تم ربط فيسبوك تلقائيًا بنجاح ✅');
+      fetchAnalyticsSettings().then((d: any) => {
+        setMetaConnected(d.is_meta_connected ?? true);
+        setFbPageId(d.fb_page_id || '');
+        setAccessToken(d.meta_access_token || '');
+      }).catch(() => {});
+    } else {
+      setError(`فشل ربط فيسبوك: ${params.get('reason') || 'خطأ غير معروف'}`);
+    }
+
+    params.delete('meta_oauth');
+    params.delete('reason');
+    const newSearch = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}${window.location.hash}`,
+    );
   }, []);
 
   const handleSave = async () => {
@@ -103,12 +150,7 @@ export default function SettingsTab() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-      <span className="mr-3 text-slate-400">جاري تحميل الإعدادات...</span>
-    </div>
-  );
+  if (loading) return <SettingsSkeleton />;
   if (error && !data) return <p className="py-12 text-center text-red-400">خطأ: {error}</p>;
 
   return (
@@ -182,6 +224,21 @@ export default function SettingsTab() {
                   className="w-full rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none" />
               </div>
             </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleConnectFacebook}
+                disabled={connectingOAuth}
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#1877F2] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#1462c9] disabled:opacity-50"
+              >
+                <Link2 className="w-4 h-4" />
+                {connectingOAuth ? 'جاري التحويل لفيسبوك...' : 'ربط تلقائي بفيسبوك (موصى به)'}
+              </button>
+              <p className="text-[11px] text-slate-500 mt-2 text-center">
+                أو استخدم Access Token يدوي كخيار احتياطي في حالة وجود مشكلة بالربط التلقائي
+              </p>
+            </div>
+
             <div className="mt-3">
               <label className="text-xs text-slate-400 block mb-1">Access Token (من Graph API Explorer)</label>
               <div className="relative">
@@ -309,7 +366,11 @@ export default function SettingsTab() {
               <Sun className={`w-5 h-5 transition-colors duration-300 ${!darkMode ? 'text-amber-400' : 'text-slate-500'}`} />
               <span className={`text-sm font-medium transition-colors duration-300 ${!darkMode ? 'text-slate-100' : 'text-slate-500'}`}>الوضع الفاتح</span>
             </div>
-            <button type="button" onClick={() => setDarkMode(!darkMode)} className="focus:outline-none mx-3">
+            <button
+  type="button"
+  onClick={() => onThemeChange(darkMode ? 'light' : 'dark')}
+  className="focus:outline-none mx-3"
+>
               {darkMode
                 ? <ToggleRight className="w-10 h-10 text-indigo-400 transition-transform duration-300" />
                 : <ToggleLeft className="w-10 h-10 text-slate-500 transition-transform duration-300" />}
