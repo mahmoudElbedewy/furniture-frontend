@@ -199,19 +199,18 @@ button {
 }
 
 .search-container {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .search-input {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
+  position: fixed;
+  top: 74px;
+  left: 16px;
+  right: 16px;
   z-index: 25;
-  width: min(280px, calc(100vw - 32px));
-  min-height: 42px;
+  min-height: 46px;
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-input);
@@ -220,6 +219,12 @@ button {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
   font: inherit;
   font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .search-input {
+    top: 70px;
+  }
 }
 
 .search-input:focus {
