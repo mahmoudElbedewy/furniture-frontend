@@ -883,19 +883,26 @@ button {
 .card-actions-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .card-actions-row .outline-btn {
   flex-direction: column;
-  gap: 4px;
-  min-height: 56px;
+  gap: 5px;
+  min-height: 64px;
   padding: 8px 4px;
-  font-size: 10.5px;
-  line-height: 1.25;
+  font-size: 11.5px;
+  line-height: 1.3;
   text-align: center;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+}
+
+.card-actions-row .outline-btn svg,
+.card-actions-row .outline-btn img {
+  flex-shrink: 0;
 }
 
 .card-actions .primary-btn,
@@ -3662,10 +3669,15 @@ button {
     font-size: 10px;
   }
 
-  .card-actions button {
-    min-height: 40px;
+  .card-actions-row {
+    gap: 6px;
+  }
+
+  .card-actions-row .outline-btn {
+    min-height: 60px;
     font-size: 11px;
-    padding: 0 10px;
+    padding: 6px 2px;
+    gap: 4px;
   }
 
   .checkout-section,
