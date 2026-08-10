@@ -4837,3 +4837,187 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* Admin-only contrast and chat presentation. */
+.admin-shell {
+  --admin-bg: #edf2f7;
+  --admin-surface: #ffffff;
+  --admin-border: #cbd5e1;
+  --admin-text: #172033;
+  --admin-muted: #475569;
+  --admin-accent: #0f766e;
+}
+
+.admin-shell .admin-dashboard-layout,
+.admin-shell .admin-main-content,
+.admin-shell .admin-sidebar {
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.admin-shell .admin-sidebar {
+  border-color: var(--admin-border);
+}
+
+.admin-shell .admin-sidebar-header,
+.admin-shell .admin-sidebar-nav button {
+  color: var(--admin-text);
+  border-color: var(--admin-border);
+}
+
+.admin-shell .admin-sidebar-nav button:hover,
+.admin-shell .admin-sidebar-nav button.active {
+  color: #ffffff;
+  background: var(--admin-accent);
+}
+
+.admin-shell .admin-card,
+.admin-shell .admin-chat-list,
+.admin-shell .admin-chat-thread,
+.admin-shell .admin-orders-list,
+.admin-shell .admin-order-detail {
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+}
+
+.admin-shell .admin-card h2,
+.admin-shell .admin-card-title,
+.admin-shell .admin-thread-header strong,
+.admin-shell .admin-chat-item strong,
+.admin-shell .admin-order-item strong,
+.admin-shell .commission-row strong {
+  color: var(--admin-text);
+}
+
+.admin-shell .admin-thread-header,
+.admin-shell .admin-reply-form,
+.admin-shell .admin-chat-item,
+.admin-shell .commission-row {
+  border-color: var(--admin-border);
+}
+
+.admin-shell .admin-thread-messages {
+  min-height: 440px;
+  background: #f8fafc;
+}
+
+.admin-shell .admin-chat-message-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.admin-shell .admin-chat-message-row.customer,
+.admin-shell .admin-chat-message-row.agent {
+  align-items: flex-start;
+}
+
+.admin-shell .admin-chat-message-row.admin {
+  align-items: flex-end;
+}
+
+.admin-shell .admin-thread-messages .message {
+  max-width: min(78%, 640px);
+  margin: 0;
+  padding: 12px 15px;
+  border-radius: 8px;
+  color: var(--admin-text);
+  font-family: Arial, Tahoma, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.admin-shell .admin-thread-messages .message.customer {
+  background: #ffffff;
+  border: 1px solid #dbe4ee;
+}
+
+.admin-shell .admin-thread-messages .message.admin {
+  color: #ffffff;
+  background: #0f766e;
+}
+
+.admin-shell .admin-thread-messages .message.agent {
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+}
+
+.admin-shell .chat-image {
+  width: min(320px, 78%);
+  margin: 0;
+  background: #ffffff;
+  border-color: var(--admin-border);
+}
+
+.admin-shell .admin-reply-form {
+  grid-template-columns: minmax(0, 1fr) 52px auto;
+  background: #ffffff;
+}
+
+.admin-shell .admin-reply-form textarea,
+.admin-shell .admin-filter-row select,
+.admin-shell .payment-form input,
+.admin-shell .payment-form select {
+  color: var(--admin-text);
+  background: #ffffff;
+  border-color: var(--admin-border);
+}
+
+.admin-shell .admin-reply-form button:not(.chat-attachment-button),
+.admin-shell .payment-form .panel-primary,
+.admin-shell .commission-row button {
+  color: #ffffff;
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+}
+
+.admin-shell .chat-attachment-button {
+  color: var(--admin-accent);
+  background: #ecfdf5;
+  border-color: #99f6e4;
+}
+
+.image-preview-list {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.image-preview {
+  position: relative;
+  width: 76px;
+  height: 76px;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+}
+
+.image-preview button {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: #ffffff;
+  background: #dc2626;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .admin-shell .admin-reply-form { grid-template-columns: minmax(0, 1fr) 48px; }
+}

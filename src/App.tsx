@@ -955,6 +955,7 @@ function App() {
   ]);
   const [draft, setDraft] = useState("");
   const [chatImages, setChatImages] = useState<File[]>([]);
+  const [chatImagePreviews, setChatImagePreviews] = useState<string[]>([]);
   const [customerUnreadCount, setCustomerUnreadCount] = useState(0);
   const [savedScrollPos, setSavedScrollPos] = useState(0);
   const [customerProfile, setCustomerProfile] =
@@ -982,7 +983,7 @@ function App() {
   >(null);
   const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState("");
   const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [commissionFilter, setCommissionFilter] = useState("");
+  const [commissionFilter, setCommissionFilter] = useState("false");
   const [payments, setPayments] = useState<StorePayment[]>([]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentType, setPaymentType] = useState<StorePayment["payment_type"]>("ads");
@@ -994,6 +995,7 @@ function App() {
   );
   const [adminReplyDraft, setAdminReplyDraft] = useState("");
   const [adminReplyImages, setAdminReplyImages] = useState<File[]>([]);
+  const [adminReplyPreviews, setAdminReplyPreviews] = useState<string[]>([]);
   const [agentUploadLoading, setAgentUploadLoading] = useState(false);
   const [adminAgentLoading, setAdminAgentLoading] = useState(false);
   const [adminAgentDraft, setAdminAgentDraft] = useState<Record<
@@ -1749,6 +1751,30 @@ const addItemToCart = (
     }
   };
 
+  const selectChatImages = (files: File[]) => {
+    chatImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    setChatImages(files);
+    setChatImagePreviews(files.map((file) => URL.createObjectURL(file)));
+  };
+
+  const removeChatImage = (index: number) => {
+    URL.revokeObjectURL(chatImagePreviews[index]);
+    setChatImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setChatImagePreviews((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const selectAdminReplyImages = (files: File[]) => {
+    adminReplyPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setAdminReplyImages(files);
+    setAdminReplyPreviews(files.map((file) => URL.createObjectURL(file)));
+  };
+
+  const removeAdminReplyImage = (index: number) => {
+    URL.revokeObjectURL(adminReplyPreviews[index]);
+    setAdminReplyImages((current) => current.filter((_, currentIndex) => currentIndex !== index));
+    setAdminReplyPreviews((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const sendMessage = async (event: FormEvent) => {
     event.preventDefault();
     const message = draft.trim();
@@ -1798,6 +1824,8 @@ const addItemToCart = (
 
       setDraft("");
       setChatImages([]);
+      chatImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+      setChatImagePreviews([]);
       if (chatImageInputRef.current) chatImageInputRef.current.value = "";
     } catch (error) {
       setChatError(
@@ -1862,6 +1890,8 @@ const addItemToCart = (
       );
       setAdminReplyDraft("");
       setAdminReplyImages([]);
+      adminReplyPreviews.forEach((url) => URL.revokeObjectURL(url));
+      setAdminReplyPreviews([]);
       if (adminReplyImageInputRef.current) adminReplyImageInputRef.current.value = "";
     } catch (error) {
       setAdminError(
@@ -2663,7 +2693,7 @@ const addItemToCart = (
                     <strong>
                       {money(dashboardStats?.received_commissions)}
                     </strong>
-                    عمولة معلقة
+                    عمولات مستلمة
                   </span>
                   <span><strong>{money(dashboardStats?.our_payments)}</strong>{"\u0645\u062f\u0641\u0648\u0639\u0627\u062a\u0646\u0627"}</span>
                   <span><strong>{money(dashboardStats?.net_profit)}</strong>{"\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0628\u062d"}</span>
@@ -2915,7 +2945,7 @@ const addItemToCart = (
                         </div>
                         <div className="admin-thread-messages">
                           {selectedAdminChat.messages.map((message) => (
-                            <div key={message.id}>
+                            <div className={`admin-chat-message-row ${getMessageSender(message)}`} key={message.id}>
                               {message.content && <p className={`message ${getMessageSender(message)}`}>{message.content}</p>}
                               {(message.attachments ?? []).map((attachment) => {
                                 const imageUrl = resolveAssetUrl(attachment.image_url ?? attachment.image);
@@ -2928,7 +2958,7 @@ const addItemToCart = (
                           className="admin-reply-form"
                           onSubmit={sendAdminReply}
                         >
-                          <input ref={adminReplyImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => setAdminReplyImages(Array.from(event.target.files ?? []))} />
+                          <input ref={adminReplyImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => selectAdminReplyImages(Array.from(event.target.files ?? []))} />
                           <textarea
                             value={adminReplyDraft}
                             onChange={(event) =>
@@ -2938,6 +2968,16 @@ const addItemToCart = (
                           />
                           <button type="button" className="chat-attachment-button" onClick={() => adminReplyImageInputRef.current?.click()} aria-label="Attach images"><Paperclip size={18} /></button>
                           <button type="submit">رد</button>
+                          {adminReplyPreviews.length > 0 && (
+                            <div className="image-preview-list">
+                              {adminReplyPreviews.map((preview, index) => (
+                                <div className="image-preview" key={preview}>
+                                  <img src={preview} alt="Preview" />
+                                  <button type="button" onClick={() => removeAdminReplyImage(index)} aria-label="Remove image">×</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </form>
                       </>
                     )}
@@ -4769,12 +4809,22 @@ const addItemToCart = (
                 }
               }}
             />
-            <input ref={chatImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => setChatImages(Array.from(event.target.files ?? []))} />
+            <input ref={chatImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => selectChatImages(Array.from(event.target.files ?? []))} />
             <button type="button" className="chat-attachment-button" onClick={() => chatImageInputRef.current?.click()} aria-label="Attach images"><Paperclip size={18} /></button>
             <button type="submit" aria-label="Send message">
               <Send size={18} />
             </button>
             {chatImages.length > 0 && <small className="attachment-count">{chatImages.length} image(s)</small>}
+            {chatImagePreviews.length > 0 && (
+              <div className="image-preview-list">
+                {chatImagePreviews.map((preview, index) => (
+                  <div className="image-preview" key={preview}>
+                    <img src={preview} alt="Preview" />
+                    <button type="button" onClick={() => removeChatImage(index)} aria-label="Remove image">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </form>
           <button type="button" className="reset-chat" onClick={resetChat}>
             بدء محادثة جديدة
