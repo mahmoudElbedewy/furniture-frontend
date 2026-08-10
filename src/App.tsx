@@ -6,6 +6,7 @@ import {
   Heart,
   Home,
   ImageUp,
+  Paperclip,
   Loader2,
   Lock,
   LogIn,
@@ -175,7 +176,10 @@ type ChatMessage = {
   content: string;
   timestamp?: string;
   cardEndpoint?: string;
+  attachments?: ChatAttachment[];
 };
+
+type ChatAttachment = { id: string | number; image?: string; image_url?: string };
 
 type ChatProductCard = {
   id: string;
@@ -214,7 +218,18 @@ type DashboardStats = {
   total_orders: number;
   total_revenue: string | number;
   pending_commissions: string | number;
+  received_commissions: string | number;
+  our_payments: string | number;
+  net_profit: string | number;
   active_products: number;
+};
+
+type StorePayment = {
+  id: string | number;
+  amount: string | number;
+  payment_type: "ads" | "shipping" | "tools" | "other";
+  description: string;
+  paid_at: string;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -499,7 +514,8 @@ const setStoredIdentity = (identifier: string, identityToken: string) => {
 
 async function request<T>(path: string, init: RequestInit = {}, isRetry = false) {
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json");
+  if (init.body instanceof FormData) headers.delete("Content-Type");
+  else headers.set("Content-Type", "application/json");
   const authHeaders = getAuthHeaders();
 
   const requiresAuth =
@@ -600,14 +616,21 @@ const api = {
   async sendChatMessage(
   conversationId: string,
   payload: { message: string; sender_type: "customer"; context: ChatContext },
+  images: File[] = [],
 ) {
   const isAuthenticated = Boolean(getAuthHeaders().Authorization);
   const identityToken = isAuthenticated ? null : getStoredIdentityToken();
+  const form = new FormData();
+  form.append("message", payload.message);
+  form.append("sender_type", payload.sender_type);
+  form.append("context", JSON.stringify(payload.context));
+  if (identityToken) form.append("identity_token", identityToken);
+  images.forEach((image) => form.append("images", image));
   return request<{ messages: ChatMessage[]; agent_error?: string }>(
     `/api/chat/${conversationId}/send/`,
     {
       method: "POST",
-      body: JSON.stringify({ ...payload, identity_token: identityToken }),
+      body: form,
     },
   );
 },
@@ -750,15 +773,37 @@ const api = {
       await request<ChatConversation[]>("/api/admin/chats/");
     return conversations.map(normalizeConversation);
   },
-  async adminReply(conversationId: string, content: string) {
+  async adminReply(conversationId: string, content: string, images: File[] = []) {
+    const form = new FormData();
+    form.append("content", content);
+    images.forEach((image) => form.append("images", image));
     const message = await request<ChatMessage>(
       `/api/admin/chats/${conversationId}/reply/`,
       {
         method: "POST",
-        body: JSON.stringify({ content }),
+        body: form,
       },
     );
     return normalizeMessage(message);
+  },
+  async listPayments() {
+    const payload = await request<StorePayment[] | { results: StorePayment[] }>("/api/admin/payments/");
+    return Array.isArray(payload) ? payload : payload.results;
+  },
+  async createPayment(payload: Omit<StorePayment, "id">) {
+    return request<StorePayment>("/api/admin/payments/", { method: "POST", body: JSON.stringify(payload) });
+  },
+  async markAdminChatRead(conversationId: string) {
+    return request(`/api/admin/chats/${conversationId}/mark_read/`, { method: "PATCH", body: JSON.stringify({}) });
+  },
+  async getCustomerUnread() {
+    return request<{ unread_count: number }>(`/api/chat/unread/?identity_token=${encodeURIComponent(getStoredIdentityToken() ?? "")}`);
+  },
+  async getPushConfig() {
+    return request<{ vapid_public_key: string }>("/api/chat/push-config/");
+  },
+  async savePushSubscription(subscription: PushSubscriptionJSON) {
+    return request("/api/chat/push-subscriptions/", { method: "POST", body: JSON.stringify(subscription) });
   },
 async toggleFavorite(productId: string, identityToken: string) {
   return request<{ message?: string } | { id: string; product: string; customer_identifier: string; created_at: string }>("/api/catalog/favorites/toggle/", {
@@ -838,6 +883,13 @@ const trackFunnelEvent = (eventType: string, productId?: string) => {
   } catch {}
 };
 
+const vapidKeyToUint8Array = (value: string) => {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const decoded = window.atob(base64);
+  return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+};
+
 function App() {
   const [hash, setHash] = useState(window.location.hash || "#catalog");
   const [products, setProducts] = useState<Product[]>([]);
@@ -902,6 +954,8 @@ function App() {
     },
   ]);
   const [draft, setDraft] = useState("");
+  const [chatImages, setChatImages] = useState<File[]>([]);
+  const [customerUnreadCount, setCustomerUnreadCount] = useState(0);
   const [savedScrollPos, setSavedScrollPos] = useState(0);
   const [customerProfile, setCustomerProfile] =
     useState<CustomerProfile | null>(null);
@@ -929,11 +983,17 @@ function App() {
   const [adminOrderStatusFilter, setAdminOrderStatusFilter] = useState("");
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [commissionFilter, setCommissionFilter] = useState("");
+  const [payments, setPayments] = useState<StorePayment[]>([]);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentType, setPaymentType] = useState<StorePayment["payment_type"]>("ads");
+  const [paymentDescription, setPaymentDescription] = useState("");
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [adminChats, setAdminChats] = useState<ChatConversation[]>([]);
   const [selectedAdminChatId, setSelectedAdminChatId] = useState<string | null>(
     null,
   );
   const [adminReplyDraft, setAdminReplyDraft] = useState("");
+  const [adminReplyImages, setAdminReplyImages] = useState<File[]>([]);
   const [agentUploadLoading, setAgentUploadLoading] = useState(false);
   const [adminAgentLoading, setAdminAgentLoading] = useState(false);
   const [adminAgentDraft, setAdminAgentDraft] = useState<Record<
@@ -956,6 +1016,8 @@ function App() {
     },
   ]);
   const socketRef = useRef<WebSocket | null>(null);
+  const chatImageInputRef = useRef<HTMLInputElement | null>(null);
+  const adminReplyImageInputRef = useRef<HTMLInputElement | null>(null);
   const productsRef = useRef<Product[]>([]);
   const favoriteDetailsFetchedRef = useRef<Set<string>>(new Set());
 
@@ -1222,12 +1284,14 @@ function App() {
       try {
         const payload = JSON.parse(event.data);
         const content = payload.message ?? payload.content;
-        if (!content) return;
+        const attachments = payload.attachments ?? [];
+        if (!content && attachments.length === 0) return;
 
         const normalized = normalizeMessage({
-          id: crypto.randomUUID(),
+          id: payload.id ?? crypto.randomUUID(),
           sender: payload.sender_type ?? "agent",
-          content,
+          content: content ?? "",
+          attachments,
         });
 
         setMessages((current) => [...current, normalized]);
@@ -1319,11 +1383,13 @@ function App() {
       const commissionsPayload = await api
         .listCommissions(commissionParams)
         .catch(() => []);
+      const paymentsPayload = await api.listPayments().catch(() => []);
       setAgentSettings(settingsPayload);
       setDashboardStats(statsPayload);
       setAdminChats(chatsPayload);
       setAdminOrders(ordersPayload);
       setCommissions(commissionsPayload);
+      setPayments(paymentsPayload);
       setSelectedAdminChatId(
         (current) => current ?? chatsPayload[0]?.id ?? null,
       );
@@ -1340,6 +1406,14 @@ function App() {
       setAdminLoading(false);
     }
   }, [adminOrderStatusFilter, commissionFilter]);
+
+  useEffect(() => {
+    if (hasAdminToken || chatOpen) return;
+    const refresh = () => api.getCustomerUnread().then((data) => setCustomerUnreadCount(data.unread_count ?? 0)).catch(() => undefined);
+    refresh();
+    const timer = window.setInterval(refresh, 12000);
+    return () => window.clearInterval(timer);
+  }, [chatOpen, hasAdminToken]);
 
   useEffect(() => {
     if (isAdminRoute && hasAdminToken) {
@@ -1635,11 +1709,28 @@ const addItemToCart = (
   );
 };
 
+  const enablePushNotifications = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || Notification.permission === "denied") return;
+    const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+    if (permission !== "granted") return;
+    const [registration, config] = await Promise.all([
+      navigator.serviceWorker.register("/chat-sw.js"),
+      api.getPushConfig(),
+    ]);
+    if (!config.vapid_public_key) return;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: vapidKeyToUint8Array(config.vapid_public_key),
+    });
+    await api.savePushSubscription(subscription.toJSON());
+  };
+
   const openContextChat = async (product?: Product) => {
     const contextProduct = product ?? activeProduct ?? undefined;
     if (contextProduct) setActiveProduct(contextProduct);
     setChatOpen(true);
     setChatError("");
+    void enablePushNotifications().catch(() => undefined);
 
     try {
       const id = await api.startChat(contextProduct);
@@ -1661,7 +1752,7 @@ const addItemToCart = (
   const sendMessage = async (event: FormEvent) => {
     event.preventDefault();
     const message = draft.trim();
-    if (!message) return;
+    if (!message && chatImages.length === 0) return;
 
     const payload = {
       message,
@@ -1677,7 +1768,7 @@ const addItemToCart = (
         setConversationId(activeConversationId);
       }
 
-      if (socketRef.current?.readyState === WebSocket.OPEN) {
+      if (socketRef.current?.readyState === WebSocket.OPEN && chatImages.length === 0) {
         socketRef.current.send(
   JSON.stringify({
     ...payload,
@@ -1690,6 +1781,7 @@ const addItemToCart = (
         const response = await api.sendChatMessage(
           activeConversationId,
           payload,
+          chatImages,
         );
         setMessages((current) => [
           ...current,
@@ -1705,6 +1797,8 @@ const addItemToCart = (
       }
 
       setDraft("");
+      setChatImages([]);
+      if (chatImageInputRef.current) chatImageInputRef.current.value = "";
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Message was not sent.",
@@ -1733,6 +1827,7 @@ const addItemToCart = (
     const readMap = getReadMap();
     readMap[chat.id] = chat.last_message_at;
     localStorage.setItem("furniture_admin_chat_reads", JSON.stringify(readMap));
+    api.markAdminChatRead(chat.id).catch(() => undefined);
   };
 
   const isUnreadChat = (chat: ChatConversation) => {
@@ -1750,10 +1845,10 @@ const addItemToCart = (
   const sendAdminReply = async (event: FormEvent) => {
     event.preventDefault();
     const content = adminReplyDraft.trim();
-    if (!selectedAdminChat || !content) return;
+    if (!selectedAdminChat || (!content && adminReplyImages.length === 0)) return;
 
     try {
-      const reply = await api.adminReply(selectedAdminChat.id, content);
+      const reply = await api.adminReply(selectedAdminChat.id, content, adminReplyImages);
       setAdminChats((current) =>
         current.map((chat) =>
           chat.id === selectedAdminChat.id
@@ -1766,10 +1861,26 @@ const addItemToCart = (
         ),
       );
       setAdminReplyDraft("");
+      setAdminReplyImages([]);
+      if (adminReplyImageInputRef.current) adminReplyImageInputRef.current.value = "";
     } catch (error) {
       setAdminError(
         error instanceof Error ? error.message : "Could not send admin reply.",
       );
+    }
+  };
+
+  const addPayment = async (event: FormEvent) => {
+    event.preventDefault();
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    try {
+      await api.createPayment({ amount, payment_type: paymentType, description: paymentDescription, paid_at: paymentDate });
+      setPaymentAmount("");
+      setPaymentDescription("");
+      await loadAdminData();
+    } catch (error) {
+      setAdminError(error instanceof Error ? error.message : "Could not save payment.");
     }
   };
 
@@ -1821,6 +1932,8 @@ const addItemToCart = (
   };
 
   const resetChat = async () => {
+    setChatOpen(false);
+    return;
     socketRef.current?.close();
     setConversationId(null);
     setChatConnected(false);
@@ -2500,6 +2613,18 @@ const addItemToCart = (
                   </button>
                   <button 
                     type="button"
+                    className={activeAdminTab === "payments" ? "active" : ""}
+                    onClick={() => { setActiveAdminTab("payments"); loadAdminData(); }}
+                  >
+                    <ShoppingBag size={18} />
+                    {"\u0645\u062f\u0641\u0648\u0639\u0627\u062a\u0646\u0627"}
+                  </button>
+                  <button type="button" className={activeAdminTab === "chats" ? "active" : ""} onClick={() => { setActiveAdminTab("chats"); loadAdminData(); }}>
+                    <MessageCircle size={18} />
+                    {"\u0645\u062d\u0627\u062f\u062b\u0627\u062a \u0627\u0644\u0639\u0645\u0644\u0627\u0621"}
+                  </button>
+                  <button
+                    type="button"
                     className={activeAdminTab === "agent" ? "active" : ""} 
                     onClick={() => setActiveAdminTab("agent")}
                   >
@@ -2536,10 +2661,12 @@ const addItemToCart = (
                   </span>
                   <span>
                     <strong>
-                      {money(dashboardStats?.pending_commissions)}
+                      {money(dashboardStats?.received_commissions)}
                     </strong>
                     عمولة معلقة
                   </span>
+                  <span><strong>{money(dashboardStats?.our_payments)}</strong>{"\u0645\u062f\u0641\u0648\u0639\u0627\u062a\u0646\u0627"}</span>
+                  <span><strong>{money(dashboardStats?.net_profit)}</strong>{"\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0628\u062d"}</span>
                                       </div>
                     </section>
                   </div>
@@ -2729,7 +2856,10 @@ const addItemToCart = (
                   ))}
                 </div>
               </section>
-
+            </div>
+          )}
+          {activeAdminTab === "chats" && (
+            <div className="admin-tab-content">
               <section className="admin-card admin-chat-card">
                 <div className="admin-card-title">
                   <MessageCircle size={22} />
@@ -2785,25 +2915,28 @@ const addItemToCart = (
                         </div>
                         <div className="admin-thread-messages">
                           {selectedAdminChat.messages.map((message) => (
-                            <p
-                              className={`message ${getMessageSender(message)}`}
-                              key={message.id}
-                            >
-                              {message.content}
-                            </p>
+                            <div key={message.id}>
+                              {message.content && <p className={`message ${getMessageSender(message)}`}>{message.content}</p>}
+                              {(message.attachments ?? []).map((attachment) => {
+                                const imageUrl = resolveAssetUrl(attachment.image_url ?? attachment.image);
+                                return imageUrl ? <img className="chat-image" src={imageUrl} alt="Attachment" key={attachment.id} /> : null;
+                              })}
+                            </div>
                           ))}
                         </div>
                         <form
                           className="admin-reply-form"
                           onSubmit={sendAdminReply}
                         >
-                          <input
+                          <input ref={adminReplyImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => setAdminReplyImages(Array.from(event.target.files ?? []))} />
+                          <textarea
                             value={adminReplyDraft}
                             onChange={(event) =>
                               setAdminReplyDraft(event.target.value)
                             }
                             placeholder="اكتب رداً يدوياً..."
                           />
+                          <button type="button" className="chat-attachment-button" onClick={() => adminReplyImageInputRef.current?.click()} aria-label="Attach images"><Paperclip size={18} /></button>
                           <button type="submit">رد</button>
                         </form>
                       </>
@@ -2811,7 +2944,22 @@ const addItemToCart = (
                   </div>
                 </div>
               </section>
-                              </div>
+            </div>
+          )}
+                {activeAdminTab === "payments" && (
+                  <div className="admin-tab-content">
+                    <section className="admin-card payments-card">
+                      <div className="admin-card-title"><ShoppingBag size={22} /><h2>{"\u0645\u062f\u0641\u0648\u0639\u0627\u062a\u0646\u0627"}</h2></div>
+                      <form className="payment-form" onSubmit={addPayment}>
+                        <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="Amount" required />
+                        <select value={paymentType} onChange={(event) => setPaymentType(event.target.value as StorePayment["payment_type"])}><option value="ads">Ads</option><option value="shipping">Shipping</option><option value="tools">Tools</option><option value="other">Other</option></select>
+                        <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} required />
+                        <input value={paymentDescription} onChange={(event) => setPaymentDescription(event.target.value)} placeholder="Description" />
+                        <button className="panel-primary" type="submit">Save</button>
+                      </form>
+                      <div className="payment-list">{payments.length === 0 ? <p className="muted">No payments recorded.</p> : payments.map((payment) => <div className="payment-row" key={payment.id}><strong>{money(payment.amount)}</strong><span>{payment.payment_type}</span><span>{payment.description || "-"}</span><time>{new Date(payment.paid_at).toLocaleDateString()}</time></div>)}</div>
+                    </section>
+                  </div>
                 )}
                 {activeAdminTab === "agent" && (
                   <div className="admin-tab-content admin-agent-grid">
@@ -4249,6 +4397,7 @@ const addItemToCart = (
         aria-label="Open customer service chat"
       >
         <MessageCircle size={24} />
+        {customerUnreadCount > 0 && <span className="chat-unread-badge">{customerUnreadCount > 99 ? "99+" : customerUnreadCount}</span>}
       </button>
 
       {cartOpen && (
@@ -4580,6 +4729,10 @@ const addItemToCart = (
                     {message.content}
                   </p>
                 )}
+                {(message.attachments ?? []).map((attachment) => {
+                  const imageUrl = resolveAssetUrl(attachment.image_url ?? attachment.image);
+                  return imageUrl ? <img className="chat-image" src={imageUrl} alt="Attachment" key={attachment.id} /> : null;
+                })}
                 {(chatProductCards[String(message.id)] ?? []).map((card) => (
                   <button
                     key={card.id}
@@ -4604,15 +4757,24 @@ const addItemToCart = (
             ))}
           </div>
           <form className="chat-form" onSubmit={sendMessage}>
-            <input
+            <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="اسأل عن هذا المنتج..."
               aria-label="Chat message"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
             />
+            <input ref={chatImageInputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => setChatImages(Array.from(event.target.files ?? []))} />
+            <button type="button" className="chat-attachment-button" onClick={() => chatImageInputRef.current?.click()} aria-label="Attach images"><Paperclip size={18} /></button>
             <button type="submit" aria-label="Send message">
               <Send size={18} />
             </button>
+            {chatImages.length > 0 && <small className="attachment-count">{chatImages.length} image(s)</small>}
           </form>
           <button type="button" className="reset-chat" onClick={resetChat}>
             بدء محادثة جديدة
