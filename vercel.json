@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/p/:id", "destination": "/api/og.js?type=product-id&id=:id" },
     { "source": "/product/:slug", "destination": "/api/og.js?type=product&slug=:slug" },
     { "source": "/products/:slug", "destination": "/api/og.js?type=product&slug=:slug" },
     { "source": "/category/:slug", "destination": "/api/og.js?type=category&slug=:slug" },

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://homestyle-store.vercel.app/sitemap.xml
+Sitemap: https://myhomestyle.store/sitemap.xml

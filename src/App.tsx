@@ -268,6 +268,45 @@ const readPathSegment = (path: string, prefix: string) => {
 const productSlugFromPath = (path: string) =>
   readPathSegment(path, "/product/") ?? readPathSegment(path, "/products/");
 
+const productShareCodeFromPath = (path: string) => readPathSegment(path, "/p/");
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const compactProductId = (productId: string) => {
+  if (!UUID_PATTERN.test(productId)) return productId;
+
+  const binary = productId
+    .replaceAll("-", "")
+    .match(/.{2}/g)
+    ?.map((byte) => String.fromCharCode(Number.parseInt(byte, 16)))
+    .join("");
+
+  return binary
+    ? window.btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")
+    : productId;
+};
+
+const productIdFromShareCode = (shareCode: string | null) => {
+  if (!shareCode) return null;
+  if (UUID_PATTERN.test(shareCode)) return shareCode;
+  if (!/^[A-Za-z0-9_-]{22}$/.test(shareCode)) return null;
+
+  try {
+    const binary = window.atob(
+      `${shareCode.replaceAll("-", "+").replaceAll("_", "/")}==`,
+    );
+    if (binary.length !== 16) return null;
+
+    const hex = Array.from(binary, (character) =>
+      character.charCodeAt(0).toString(16).padStart(2, "0"),
+    ).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  } catch {
+    return null;
+  }
+};
+
 const categorySlugFromPath = (path: string) =>
   readPathSegment(path, "/category/");
 
@@ -276,7 +315,7 @@ const routeHashFromPath = (path: string) => {
   if (cleanPath === "/" || cleanPath === "/products" || cleanPath.startsWith("/category/")) {
     return "#catalog";
   }
-  if (cleanPath.startsWith("/product/") || productSlugFromPath(cleanPath)) {
+  if (productSlugFromPath(cleanPath) || productShareCodeFromPath(cleanPath)) {
     return "#details";
   }
   if (cleanPath === "/checkout") return "#checkout";
@@ -373,15 +412,18 @@ const resolveAssetUrl = (url?: string | null) => {
   return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 };
 
-const productPageUrl = (product: Pick<Product, "slug">) =>
-  new URL(`/product/${encodeURIComponent(product.slug)}`, window.location.origin).toString();
+const productShareUrl = (product: Pick<Product, "id">) =>
+  new URL(
+    `/p/${encodeURIComponent(compactProductId(product.id))}`,
+    window.location.origin,
+  ).toString();
 
-const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "slug">) => {
+const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "id">) => {
   const message = [
     "مرحباً، أريد الاستفسار عن المنتج التالي:",
     `المنتج: ${product.title}`,
     `السعر: ${money(product.final_price)}`,
-    `رابط المنتج المباشر: ${productPageUrl(product)}`,
+    `رابط المنتج المباشر: ${productShareUrl(product)}`,
   ].join("\n\n");
   window.open(
     `https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(message)}`,
@@ -390,7 +432,8 @@ const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "s
   );
 };
 
-const SITE_ORIGIN = "https://homestyle-store.vercel.app";
+const SITE_ORIGIN = "https://myhomestyle.store";
+const SITE_LOGO_SHARE_IMAGE = `${SITE_ORIGIN}/og-logo.png`;
 const DEFAULT_META_DESCRIPTION =
   "Home Style: contemporary furniture in Egypt. Discover sofas, bedrooms, dining rooms, and home furniture.";
 
@@ -411,7 +454,9 @@ function RouteMeta({
 }) {
   const normalizedPath = normalizePath(pathname);
   const categorySlug = categorySlugFromPath(normalizedPath);
-  const isProductPage = Boolean(productSlugFromPath(normalizedPath));
+  const isProductPage = Boolean(
+    productSlugFromPath(normalizedPath) || productShareCodeFromPath(normalizedPath),
+  );
   const noIndexPaths = new Set([
     "/cart",
     "/checkout",
@@ -430,14 +475,14 @@ function RouteMeta({
 
   let title = "Home Style | Furniture in Egypt";
   let description = DEFAULT_META_DESCRIPTION;
-  let image = heroImage;
+  let image = SITE_LOGO_SHARE_IMAGE;
 
   if (isProductPage && product) {
     title = `${product.title} | Home Style`;
     description = normalizeMetaDescription(
       `${product.title}. ${product.description ?? ""}`,
     );
-    image = resolveAssetUrl(getImageUrl(product.images)) ?? heroImage;
+    image = resolveAssetUrl(getImageUrl(product.images)) ?? SITE_LOGO_SHARE_IMAGE;
   } else if (normalizedPath === "/products" || normalizedPath === "/") {
     title = "Home Style";
     description =
@@ -452,7 +497,13 @@ function RouteMeta({
       "Learn about Home Style and browse furniture selected for modern homes in Egypt.";
   }
 
-  const canonical = `${SITE_ORIGIN}${normalizedPath === "/" ? "/" : normalizedPath}`;
+  const canonicalPath =
+    isProductPage && product
+      ? `/product/${encodeURIComponent(product.slug)}`
+      : normalizedPath === "/"
+        ? "/"
+        : normalizedPath;
+  const canonical = `${SITE_ORIGIN}${canonicalPath}`;
   const productSchema =
     isProductPage && product
       ? {
@@ -488,6 +539,7 @@ function RouteMeta({
       <meta property="og:description" content={description} />
       <meta property="og:url" content={canonical} />
       <meta property="og:image" content={image} />
+      <meta property="og:image:alt" content={title} />
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
@@ -797,6 +849,9 @@ const api = {
   },
   async getProduct(slug: string) {
     return request<Product>(`/api/catalog/products/${slug}/`);
+  },
+  async getProductById(productId: string) {
+    return request<Product>(`/api/catalog/products/id/${encodeURIComponent(productId)}/`);
   },
   async startChat({
     product,
@@ -1170,6 +1225,8 @@ function App() {
   const navigate = useNavigate();
   const hash = routeHashFromPath(location.pathname);
   const routeProductSlug = productSlugFromPath(location.pathname);
+  const routeProductShareCode = productShareCodeFromPath(location.pathname);
+  const routeProductId = productIdFromShareCode(routeProductShareCode);
   const routeCategorySlug = categorySlugFromPath(location.pathname);
   const [products, setProducts] = useState<Product[]>([]);
   useEffect(() => {
@@ -1445,7 +1502,9 @@ function App() {
       setCategories(categoryPayload);
       setProducts(productResults);
       setActiveProduct((current) =>
-        routeProductSlug ? current : current ?? productResults[0] ?? null,
+        routeProductSlug || routeProductShareCode
+          ? current
+          : current ?? productResults[0] ?? null,
       );
     } catch (error) {
       setProducts([]);
@@ -1468,6 +1527,7 @@ function App() {
     searchQuery,
     currentPage,
     routeProductSlug,
+    routeProductShareCode,
   ]);
 
   const loadCustomerProfile = useCallback(async () => {
@@ -1846,7 +1906,12 @@ const mainTab = useMemo<
 }, [mainTab, navigate]);
 
   useEffect(() => {
-    if (mainTab !== "details" || !routeProductSlug) return;
+    if (
+      mainTab !== "details" ||
+      (!routeProductSlug && !routeProductShareCode)
+    ) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -1854,7 +1919,12 @@ const mainTab = useMemo<
       setDetailsLoading(true);
       setDetailsError("");
       try {
-        const product = await api.getProduct(routeProductSlug);
+        if (routeProductShareCode && !routeProductId) {
+          throw new Error("رابط المنتج غير صالح.");
+        }
+        const product = routeProductShareCode
+          ? await api.getProductById(routeProductId as string)
+          : await api.getProduct(routeProductSlug as string);
         if (cancelled) return;
         setActiveProduct(product);
         setActiveImageIndex(0);
@@ -1877,7 +1947,7 @@ const mainTab = useMemo<
     return () => {
       cancelled = true;
     };
-  }, [mainTab, routeProductSlug]);
+  }, [mainTab, routeProductId, routeProductShareCode, routeProductSlug]);
 
   const chatContext = useMemo<ChatContext>(() => {
     const currentPage = `${location.pathname}${location.search}`;
@@ -5002,7 +5072,7 @@ const addItemToCart = (
                   className="whatsapp-checkout-btn"
                   onClick={() => {
                     const orderMessage = cart.map(item =>
-                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}\nرابط المنتج: ${productPageUrl(item.product)}`
+                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}\nرابط المنتج: ${productShareUrl(item.product)}`
                     ).join('\n');
                     const message = `مرحباً، أريد إنشاء طلب جديد:\n\n${orderMessage}\n\nالمجموع: ${money(subtotal)}\nالشحن: ${money(totalShipping)}\nالإجمالي: ${money(grandTotal)}`;
                     const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;

@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const SITE_URL = "https://homestyle-store.vercel.app";
+const SITE_URL = "https://myhomestyle.store";
 const API_BASE_URL = "https://mahmoudelbedewy-fureniture.hf.space";
 
 const __filename = fileURLToPath(import.meta.url);

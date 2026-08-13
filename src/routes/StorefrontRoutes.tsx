@@ -13,6 +13,7 @@ export default function StorefrontRoutes() {
         <Route path="products" element={<App />} />
         <Route path="products/:slug" element={<App />} />
         <Route path="product/:slug" element={<App />} />
+        <Route path="p/:id" element={<App />} />
         <Route path="category/:slug" element={<App />} />
         <Route path="cart" element={<App />} />
         <Route path="wishlist" element={<App />} />

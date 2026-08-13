@@ -1,11 +1,28 @@
 const API_ORIGIN = "https://mahmoudelbedewy-fureniture.hf.space";
-const SITE_ORIGIN = "https://homestyle-store.vercel.app";
-const DEFAULT_IMAGE =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=85";
+const SITE_ORIGIN = "https://myhomestyle.store";
+const LOGO_IMAGE = `${SITE_ORIGIN}/og-logo.png`;
+const DEFAULT_IMAGE = LOGO_IMAGE;
 const BOT_PATTERN =
-  /bot|facebook|whatsapp|telegram|twitter|linkedin|pinterest|discord|slack/i;
+  /bot|facebook|whatsapp|telegram|twitter|linkedin|pinterest|discord|slack|crawler|preview|embed|skypeuripreview|applebot|tiktok|line/i;
 
 const firstValue = (value) => (Array.isArray(value) ? value[0] : value);
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const productIdFromShareCode = (shareCode) => {
+  if (!shareCode) return null;
+  if (UUID_PATTERN.test(shareCode)) return shareCode;
+  if (!/^[A-Za-z0-9_-]{22}$/.test(shareCode)) return null;
+
+  const hex = Buffer.from(
+    `${shareCode.replaceAll("-", "+").replaceAll("_", "/")}==`,
+    "base64",
+  ).toString("hex");
+  if (hex.length !== 32) return null;
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -28,11 +45,15 @@ const absoluteUrl = (url) => {
 };
 
 const productImage = (product) => {
-  const firstImage = Array.isArray(product?.images) ? product.images[0] : null;
-  if (typeof firstImage === "string") return absoluteUrl(firstImage);
-  if (firstImage && typeof firstImage === "object") {
+  const images = Array.isArray(product?.images) ? product.images : [];
+  const primaryImage = images.find(
+    (image) => image && typeof image === "object" && image.is_primary,
+  );
+  const image = primaryImage ?? images[0];
+  if (typeof image === "string") return absoluteUrl(image);
+  if (image && typeof image === "object") {
     return absoluteUrl(
-      firstImage.image_url ?? firstImage.image ?? firstImage.url,
+      image.image_url ?? image.image ?? image.url,
     );
   }
   return DEFAULT_IMAGE;
@@ -68,11 +89,13 @@ const renderPage = ({
   <meta name="robots" content="${noIndex ? "noindex, nofollow" : "index, follow"}">
   <link rel="canonical" href="${safeCanonical}">
   <meta property="og:type" content="${escapeHtml(type)}">
-  <meta property="og:site_name" content="HA Furniture">
+  <meta property="og:site_name" content="Home Style">
   <meta property="og:url" content="${safeCanonical}">
   <meta property="og:title" content="${safeTitle}">
   <meta property="og:description" content="${safeDescription}">
   <meta property="og:image" content="${safeImage}">
+  <meta property="og:image:alt" content="${safeTitle}">
+  <meta property="og:image:secure_url" content="${safeImage}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${safeTitle}">
   <meta name="twitter:description" content="${safeDescription}">
@@ -88,6 +111,7 @@ const renderPage = ({
 export default async function handler(req, res) {
   const type = firstValue(req.query.type) || "product";
   const slug = firstValue(req.query.slug);
+  const productId = productIdFromShareCode(firstValue(req.query.id));
   const userAgent = req.headers["user-agent"] || "";
   const protocol = req.headers["x-forwarded-proto"] || "https";
   const host = req.headers["x-forwarded-host"] || req.headers.host;
@@ -106,16 +130,25 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (type === "product-id" && !productId) {
+      return res.status(404).send("Product not found");
+    }
+
     let page = {
-      title: "HA Furniture | Furniture in Egypt",
+      title: "Home Style | Furniture in Egypt",
       description:
-        "Discover sofas, bedrooms, dining rooms, and modern home furniture from HA Furniture in Egypt.",
+        "Discover sofas, bedrooms, dining rooms, and modern home furniture from Home Style in Egypt.",
       canonical: `${SITE_ORIGIN}/`,
+      image: LOGO_IMAGE,
     };
 
-    if (type === "product" && slug) {
+    if ((type === "product" && slug) || (type === "product-id" && productId)) {
+      const productEndpoint =
+        type === "product-id"
+          ? `/api/catalog/products/id/${encodeURIComponent(productId)}/`
+          : `/api/catalog/products/${encodeURIComponent(slug)}/`;
       const productResponse = await fetch(
-        `${API_ORIGIN}/api/catalog/products/${encodeURIComponent(slug)}/`,
+        `${API_ORIGIN}${productEndpoint}`,
       );
       if (!productResponse.ok) {
         return res.status(404).send("Product not found");
@@ -126,9 +159,9 @@ export default async function handler(req, res) {
       const image = productImage(product);
       const price = Number(product.final_price);
       page = {
-        title: `${product.title} | HA Furniture`,
+        title: `${product.title} | Home Style`,
         description: truncate(
-          `${product.title}. ${product.description || "Furniture from HA Furniture in Egypt."}`,
+          `${product.title}. ${product.description || "Furniture from Home Style in Egypt."}`,
         ),
         canonical,
         image,
@@ -161,23 +194,23 @@ export default async function handler(req, res) {
         : null;
       const categoryName = category?.name || String(slug).replace(/-/g, " ");
       page = {
-        title: `${categoryName} Furniture | HA Furniture`,
-        description: `Explore ${categoryName} furniture from HA Furniture in Egypt.`,
+        title: `${categoryName} Furniture | Home Style`,
+        description: `Explore ${categoryName} furniture from Home Style in Egypt.`,
         canonical: `${SITE_ORIGIN}/category/${encodeURIComponent(slug)}`,
         image: absoluteUrl(category?.image) || DEFAULT_IMAGE,
       };
     } else if (type === "products") {
       page = {
-        title: "Furniture Collection | HA Furniture",
+        title: "Furniture Collection | Home Style",
         description:
-          "Explore HA Furniture collections in Egypt: sofas, bedrooms, dining rooms, and modern home furniture.",
+          "Explore Home Style collections in Egypt: sofas, bedrooms, dining rooms, and modern home furniture.",
         canonical: `${SITE_ORIGIN}/products`,
       };
     } else if (type === "about") {
       page = {
-        title: "About HA Furniture",
+        title: "About Home Style",
         description:
-          "Learn about HA Furniture and browse furniture selected for modern homes in Egypt.",
+          "Learn about Home Style and browse furniture selected for modern homes in Egypt.",
         canonical: `${SITE_ORIGIN}/about`,
       };
     }

@@ -2,357 +2,357 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Core pages -->
   <url>
-    <loc>https://homestyle-store.vercel.app/</loc>
+    <loc>https://myhomestyle.store/</loc>
     <priority>1.0</priority>
     <changefreq>daily</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/products</loc>
+    <loc>https://myhomestyle.store/products</loc>
     <priority>1.0</priority>
     <changefreq>daily</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/about</loc>
+    <loc>https://myhomestyle.store/about</loc>
     <priority>0.4</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/جزامات</loc>
+    <loc>https://myhomestyle.store/category/بانكيت</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/دولاب</loc>
+    <loc>https://myhomestyle.store/category/دولاب</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/كوفي-كورنر</loc>
+    <loc>https://myhomestyle.store/category/ترابيزات-انتريه</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/وحدات-أدراج</loc>
+    <loc>https://myhomestyle.store/category/ترابيزات-الشاشة</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/ترابيزات-انتريه</loc>
+    <loc>https://myhomestyle.store/category/مكتبات</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/ترابيزات-الشاشة</loc>
+    <loc>https://myhomestyle.store/category/جزامات</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/بانكيت</loc>
+    <loc>https://myhomestyle.store/category/دريسنج</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/مكتبات</loc>
+    <loc>https://myhomestyle.store/category/دولاب-مطبخ</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/دولاب-مطبخ</loc>
+    <loc>https://myhomestyle.store/category/كوفي-كورنر</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/دريسنج</loc>
+    <loc>https://myhomestyle.store/category/مكاتب</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/category/مكاتب</loc>
+    <loc>https://myhomestyle.store/category/وحدات-أدراج</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتب-بمكتبة-2-درج-وضلفة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-كابتونيه-برجول-استيل</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/طقم-جزامة-ومرايا-ورف</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-4-درج</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/جزامة-4-ضلفة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-جزامة-درج-بسحارة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/كوفي-كورنر-رف</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-2-درج-بسحارة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/وحدة-أدراج-6-درج</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-جزامه-او-سحاره-شيك-جدا</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/جزامة-٥-رف</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-بلسية-سحارة-بشكل-جديد</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-كابتونيه-برجول-استيل</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-السحارة-بشكل-جديد</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-4-درج</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-جزامة-او-سحارة-مزود-بشرائح</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-جزامة-درج-بسحارة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-فرو-برجول-استالس</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-2-درج-بسحارة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-بلسية-سحارة-كابتونيه</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتب-درجتين-ودرفة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-كابتونية-سحارة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزة-شاشة</loc>
+    <loc>https://myhomestyle.store/product/بانكيت-بشكل-جديد-بشرائط-استالس</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-الأناقة</loc>
+    <loc>https://myhomestyle.store/product/دولاب-الأناقة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزة-ركنة</loc>
+    <loc>https://myhomestyle.store/product/دولاب-درفتين-عرض-متر</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-درفتين-عرض-متر</loc>
+    <loc>https://myhomestyle.store/product/دولاب-الاختصار</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-الاختصار</loc>
+    <loc>https://myhomestyle.store/product/الدولاب-الضلفتين-الرايق</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتبة-٤-رف-مكتبة-قمرين</loc>
+    <loc>https://myhomestyle.store/product/دولاب-قمر</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-خزين-f336</loc>
+    <loc>https://myhomestyle.store/product/دولاب-واخد-الشكل-و-الخامة-مع-بعض</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/الدولاب-الضلفتين-الرايق</loc>
+    <loc>https://myhomestyle.store/product/دولاب 3 درج وشماعتين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/الدريسنج-الجزامة</loc>
+    <loc>https://myhomestyle.store/product/دولاب-٣-درفة-و-درجين-مجره-معدن</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/المكتبة-٤-رف-مقاس-٨٠-سم</loc>
+    <loc>https://myhomestyle.store/product/دولاب-بوحدة-ارفف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتبة-الجمال</loc>
+    <loc>https://myhomestyle.store/product/دولاب-تصميم-جديد-كله-ارفف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتبة-بدرفتين</loc>
+    <loc>https://myhomestyle.store/product/دولاب-شيك-٤-درج</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/جزامة-سوفت-كلوز</loc>
+    <loc>https://myhomestyle.store/product/دولاب-٣-ضلفة-بشماعتين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-قمر</loc>
+    <loc>https://myhomestyle.store/product/شكلين-من-أشكال-الدواليب-شكل-أرفف-كله-شكل-أرفف-وشماعة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/منظم-للألعاب-و-البوكسات-و-يلم-كل-الحاجات-مكتبة-مربعات-أيكيا</loc>
+    <loc>https://myhomestyle.store/product/ترابيزة-ركنة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتبة-٤-رف</loc>
+    <loc>https://myhomestyle.store/product/ترابيزات-انتريه-خشب-زان-احمر</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-خزين</loc>
+    <loc>https://myhomestyle.store/product/اتنين-ترابيزات-انتريه</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/مكتبه-مربعات</loc>
+    <loc>https://myhomestyle.store/product/اتقل-ترابيزات-أنتريه</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزات-الشاشة</loc>
+    <loc>https://myhomestyle.store/product/ترابيزة-شاشة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-جزامه-او-سحاره-شيك-جدا</loc>
+    <loc>https://myhomestyle.store/product/ترابيزات-الشاشة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-بلسية-سحارة-بشكل-جديد</loc>
+    <loc>https://myhomestyle.store/product/ترابيزات-الشاشه-بالكانيه</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-السحارة-بشكل-جديد</loc>
+    <loc>https://myhomestyle.store/product/ترابيزات-الشاشه-مقاس-160-سم</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-جزامة-او-سحارة-مزود-بشرائح</loc>
+    <loc>https://myhomestyle.store/product/tv-unit</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-فرو-برجول-استالس</loc>
+    <loc>https://myhomestyle.store/product/مكتبة-٤-رف-مكتبة-قمرين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-بلسية-سحارة-كابتونيه</loc>
+    <loc>https://myhomestyle.store/product/المكتبة-٤-رف-مقاس-٨٠-سم</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-كابتونية-سحارة</loc>
+    <loc>https://myhomestyle.store/product/مكتبة-الجمال</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/بانكيت-بشكل-جديد-بشرائط-استالس</loc>
+    <loc>https://myhomestyle.store/product/مكتبة-بدرفتين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-نص-دوران-سبرس</loc>
+    <loc>https://myhomestyle.store/product/منظم-للألعاب-و-البوكسات-و-يلم-كل-الحاجات-مكتبة-مربعات-أيكيا</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-واخد-الشكل-و-الخامة-مع-بعض</loc>
+    <loc>https://myhomestyle.store/product/مكتبة-٤-رف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب 3 درج وشماعتين</loc>
+    <loc>https://myhomestyle.store/product/مكتبه-مربعات</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزات-انتريه-خشب-زان-احمر</loc>
+    <loc>https://myhomestyle.store/product/مكتب-بمكتبة-2-درج-وضلفة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزات-الشاشه-بالكانيه</loc>
+    <loc>https://myhomestyle.store/product/طقم-جزامة-ومرايا-ورف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/ترابيزات-الشاشه-مقاس-160-سم</loc>
+    <loc>https://myhomestyle.store/product/جزامة-4-ضلفة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/اتنين-ترابيزات-انتريه</loc>
+    <loc>https://myhomestyle.store/product/كوفي-كورنر-رف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/اتقل-ترابيزات-أنتريه</loc>
+    <loc>https://myhomestyle.store/product/وحدة-أدراج-6-درج</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/وحده-8-درج</loc>
+    <loc>https://myhomestyle.store/product/جزامة-٥-رف</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/tv-unit</loc>
+    <loc>https://myhomestyle.store/product/مكتب-درجتين-ودرفة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/كوفي-كورنر-مودرن</loc>
+    <loc>https://myhomestyle.store/product/دولاب-خزين-f336</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/كوفي-كورنر-رف-خزين</loc>
+    <loc>https://myhomestyle.store/product/الدريسنج-الجزامة</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-٣-درفة-و-درجين-مجره-معدن</loc>
+    <loc>https://myhomestyle.store/product/جزامة-سوفت-كلوز</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-بوحدة-ارفف</loc>
+    <loc>https://myhomestyle.store/product/دولاب-خزين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-تصميم-جديد-كله-ارفف</loc>
+    <loc>https://myhomestyle.store/product/دولاب-نص-دوران-سبرس</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-شيك-٤-درج</loc>
+    <loc>https://myhomestyle.store/product/وحده-8-درج</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/دولاب-٣-ضلفة-بشماعتين</loc>
+    <loc>https://myhomestyle.store/product/كوفي-كورنر-مودرن</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/شكلين-من-أشكال-الدواليب-شكل-أرفف-كله-شكل-أرفف-وشماعة</loc>
+    <loc>https://myhomestyle.store/product/كوفي-كورنر-رف-خزين</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://homestyle-store.vercel.app/product/جزامة-ليد-درفة-جرار</loc>
+    <loc>https://myhomestyle.store/product/جزامة-ليد-درفة-جرار</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>
