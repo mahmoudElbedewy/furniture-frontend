@@ -2,8 +2,6 @@ const API_ORIGIN = "https://mahmoudelbedewy-fureniture.hf.space";
 const SITE_ORIGIN = "https://myhomestyle.store";
 const LOGO_IMAGE = `${SITE_ORIGIN}/og-logo.png`;
 const DEFAULT_IMAGE = LOGO_IMAGE;
-const BOT_PATTERN =
-  /bot|facebook|whatsapp|telegram|twitter|linkedin|pinterest|discord|slack|crawler|preview|embed|skypeuripreview|applebot|tiktok|line/i;
 
 const firstValue = (value) => (Array.isArray(value) ? value[0] : value);
 
@@ -59,7 +57,7 @@ const productImage = (product) => {
   return DEFAULT_IMAGE;
 };
 
-const renderPage = ({
+const renderMetadata = ({
   title,
   description,
   canonical,
@@ -79,11 +77,7 @@ const renderPage = ({
         .replace(/&/g, "\\u0026")}</script>`
     : "";
 
-  return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  return `
   <title>${safeTitle}</title>
   <meta name="description" content="${safeDescription}">
   <meta name="robots" content="${noIndex ? "noindex, nofollow" : "index, follow"}">
@@ -100,34 +94,33 @@ const renderPage = ({
   <meta name="twitter:title" content="${safeTitle}">
   <meta name="twitter:description" content="${safeDescription}">
   <meta name="twitter:image" content="${safeImage}">
-  ${jsonLd}
-</head>
-<body>
-  <main><h1>${safeTitle}</h1><p>${safeDescription}</p></main>
-</body>
-</html>`;
+  <meta name="twitter:image:alt" content="${safeTitle}">
+  ${jsonLd}`;
+};
+
+const renderStorefrontPage = (spaHtml, page) => {
+  const withoutStaticMetadata = spaHtml
+    .replace(/<title\b[^>]*>[\s\S]*?<\/title>\s*/i, "")
+    .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, "")
+    .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, "")
+    .replace(
+      /<meta\b[^>]*(?:\bproperty=["']og:[^"']+["']|\bname=["']twitter:[^"']+["'])[^>]*>\s*/gi,
+      "",
+    );
+
+  return withoutStaticMetadata.replace(
+    /<\/head>/i,
+    `${renderMetadata(page)}\n</head>`,
+  );
 };
 
 export default async function handler(req, res) {
   const type = firstValue(req.query.type) || "product";
   const slug = firstValue(req.query.slug);
   const productId = productIdFromShareCode(firstValue(req.query.id));
-  const userAgent = req.headers["user-agent"] || "";
   const protocol = req.headers["x-forwarded-proto"] || "https";
   const host = req.headers["x-forwarded-host"] || req.headers.host;
   const requestOrigin = host ? `${protocol}://${host}` : SITE_ORIGIN;
-
-  if (!BOT_PATTERN.test(userAgent)) {
-    try {
-      const spaResponse = await fetch(`${requestOrigin}/index.html`);
-      if (!spaResponse.ok) throw new Error(`SPA request failed: ${spaResponse.status}`);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(200).send(await spaResponse.text());
-    } catch (error) {
-      console.error("Unable to serve the SPA shell", error);
-      return res.status(500).send("Unable to load the application.");
-    }
-  }
 
   try {
     if (type === "product-id" && !productId) {
@@ -215,9 +208,19 @@ export default async function handler(req, res) {
       };
     }
 
+    const spaResponse = await fetch(`${requestOrigin}/index.html`);
+    if (!spaResponse.ok) {
+      throw new Error(`SPA request failed: ${spaResponse.status}`);
+    }
+
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=3600");
-    return res.status(200).send(renderPage(page));
+    res.setHeader(
+      "Cache-Control",
+      "public, max-age=0, s-maxage=300, stale-while-revalidate=60",
+    );
+    return res.status(200).send(
+      renderStorefrontPage(await spaResponse.text(), page),
+    );
   } catch (error) {
     console.error("Unable to generate metadata", error);
     return res.status(500).send("Unable to generate page metadata.");
