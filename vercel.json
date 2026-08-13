@@ -1,6 +1,11 @@
 {
   "rewrites": [
-    { "source": "/products/:slug", "destination": "/api/og.js?slug=:slug" },
+    { "source": "/product/:slug", "destination": "/api/og.js?type=product&slug=:slug" },
+    { "source": "/products/:slug", "destination": "/api/og.js?type=product&slug=:slug" },
+    { "source": "/category/:slug", "destination": "/api/og.js?type=category&slug=:slug" },
+    { "source": "/products", "destination": "/api/og.js?type=products" },
+    { "source": "/about", "destination": "/api/og.js?type=about" },
+    { "source": "/", "destination": "/api/og.js?type=home" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

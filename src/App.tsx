@@ -25,11 +25,23 @@ import {
   User,
   X,
 } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import AnalyticsDashboard from "./components/AnalyticsDashboard/AnalyticsDashboard";
+import {
+  FURNITURE_IDENTITY_READY_EVENT,
+} from "./contexts/cartStore";
+import { useCart } from "./contexts/useCart";
+import {
+  WishlistProvider,
+} from "./contexts/WishlistContext";
+import type { FavoriteProduct } from "./contexts/wishlistStore";
+import type { CartItem, Product, ProductVariant } from "./types/storefront";
 declare global {
   interface Window {
     fbq?: (...args: unknown[]) => void;
+    gtag?: (...args: unknown[]) => void;
   }
 }
 type Category = {
@@ -39,63 +51,12 @@ type Category = {
   image?: string | null;
 };
 
-type Product = {
-  id: string;
-  title: string;
-  slug: string;
-  variants?: ProductVariant[];
-  description?: string | null;
-  material?: string | null;
-  color?: string | null;
-  dimensions?: string | null;
-  final_price: string;
-  is_available?: boolean;
-  category_name: string;
-  requires_deposit?: boolean;
-  deposit_amount?: string | null;
-  deposit_note?: string | null;
-  default_shipping_price?: string | null;
-  ships_nationwide?: boolean;
-  images?: unknown;
-  shipping_rates?: Array<{
-    governorate_name: string;
-    area_name: string | null;
-    price: string;
-  }>;
-  shipping_summary?: {
-    free_shipping_areas: string[];
-    paid_shipping_areas: Array<{
-      price: string;
-      areas: string[];
-      count: number;
-    }>;
-    has_free_shipping: boolean;
-    default_price: string | null;
-    message: string;
-  };
-};
-
 type PaginatedProducts = {
   count: number;
   next: string | null;
   previous: string | null;
   results: Product[];
 };
-type ProductVariant = {
-  id: string;
-  size_name: string;
-  price: string;
-  is_available?: boolean;
-};
-
-type CartItem = {
-  product: Product;
-  quantity: number;
-  selectedLocation?: string | null;
-  shippingPrice?: number;
-  selectedVariant?: ProductVariant | null;
-};
-
 type OrderItemPayload = {
   product_id: string;
   quantity: number;
@@ -164,10 +125,60 @@ type ProductDraftResponse = {
 
 type ChatContext = {
   current_page: string;
+  page_type:
+    | "catalog"
+    | "product"
+    | "category"
+    | "cart"
+    | "wishlist"
+    | "checkout"
+    | "orders"
+    | "track"
+    | "about"
+    | "auth"
+    | "admin"
+    | "other";
   product_id?: string;
+  product_slug?: string;
   product_name?: string;
   category_name?: string;
+  recent_navigation?: BrowsingEvent[];
 };
+
+type BrowsingEvent = Omit<ChatContext, "recent_navigation"> & {
+  visited_at?: string;
+};
+
+type ChatSession = {
+  conversationId: string;
+  identityToken: string;
+};
+
+const NAVIGATION_HISTORY_KEY = "furniture_chat_navigation_history";
+
+function pageTypeFromPath(path: string): ChatContext["page_type"] {
+  if (path.startsWith("/product/")) return "product";
+  if (path.startsWith("/category/")) return "category";
+  if (path === "/" || path === "/products") return "catalog";
+  if (path.startsWith("/cart")) return "cart";
+  if (path.startsWith("/wishlist")) return "wishlist";
+  if (path.startsWith("/checkout")) return "checkout";
+  if (path.startsWith("/orders")) return "orders";
+  if (path.startsWith("/track")) return "track";
+  if (path.startsWith("/about")) return "about";
+  if (path.startsWith("/login") || path.startsWith("/register")) return "auth";
+  if (path.startsWith("/admin")) return "admin";
+  return "other";
+}
+
+function readNavigationHistory(): BrowsingEvent[] {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(NAVIGATION_HISTORY_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((entry) => entry?.current_page).slice(-12) : [];
+  } catch {
+    return [];
+  }
+}
 
 type ChatMessage = {
   id: string | number;
@@ -233,6 +244,8 @@ type StorePayment = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const CATALOG_PAGE_SIZE = 16;
+const WHATSAPP_BUSINESS_NUMBER = "201503466584";
 const WS_BASE_URL =
   import.meta.env.VITE_WS_BASE_URL ??
   (import.meta.env.DEV
@@ -241,6 +254,68 @@ const WS_BASE_URL =
 
 const heroImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=85";
+
+const normalizePath = (path: string) =>
+  path.length > 1 ? path.replace(/\/+$/, "") : path;
+
+const readPathSegment = (path: string, prefix: string) => {
+  const cleanPath = normalizePath(path);
+  if (!cleanPath.startsWith(prefix)) return null;
+  const segment = cleanPath.slice(prefix.length).split("/")[0];
+  return segment ? decodeURIComponent(segment) : null;
+};
+
+const productSlugFromPath = (path: string) =>
+  readPathSegment(path, "/product/") ?? readPathSegment(path, "/products/");
+
+const categorySlugFromPath = (path: string) =>
+  readPathSegment(path, "/category/");
+
+const routeHashFromPath = (path: string) => {
+  const cleanPath = normalizePath(path);
+  if (cleanPath === "/" || cleanPath === "/products" || cleanPath.startsWith("/category/")) {
+    return "#catalog";
+  }
+  if (cleanPath.startsWith("/product/") || productSlugFromPath(cleanPath)) {
+    return "#details";
+  }
+  if (cleanPath === "/checkout") return "#checkout";
+  if (cleanPath === "/orders") return "#orders";
+  if (cleanPath === "/track") return "#track";
+  if (cleanPath === "/login") return "#login";
+  if (cleanPath === "/register") return "#register";
+  if (cleanPath === "/logout") return "#logout";
+  if (cleanPath === "/admin" || cleanPath.startsWith("/admin-panel")) return "#admin";
+  if (cleanPath === "/analytics") return "#analytics";
+  if (cleanPath === "/cart" || cleanPath === "/wishlist" || cleanPath === "/about") return "#catalog";
+  return "#notfound";
+};
+
+const pathFromHash = (hash: string, product?: Product | null) => {
+  switch (hash) {
+    case "#details":
+      return product?.slug ? `/product/${encodeURIComponent(product.slug)}` : "/products";
+    case "#checkout":
+      return "/checkout";
+    case "#orders":
+      return "/orders";
+    case "#track":
+      return "/track";
+    case "#login":
+      return "/login";
+    case "#register":
+      return "/register";
+    case "#logout":
+      return "/logout";
+    case "#admin":
+      return "/admin";
+    case "#analytics":
+      return "/analytics";
+    case "#catalog":
+    default:
+      return "/products";
+  }
+};
 
 const money = (value?: string | number | null) => {
   const numeric = Number(value ?? 0);
@@ -297,6 +372,134 @@ const resolveAssetUrl = (url?: string | null) => {
   if (url.startsWith("http")) return url;
   return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 };
+
+const productPageUrl = (product: Pick<Product, "slug">) =>
+  new URL(`/product/${encodeURIComponent(product.slug)}`, window.location.origin).toString();
+
+const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "slug">) => {
+  const message = [
+    "مرحباً، أريد الاستفسار عن المنتج التالي:",
+    `المنتج: ${product.title}`,
+    `السعر: ${money(product.final_price)}`,
+    `رابط المنتج المباشر: ${productPageUrl(product)}`,
+  ].join("\n\n");
+  window.open(
+    `https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(message)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+};
+
+const SITE_ORIGIN = "https://homestyle-store.vercel.app";
+const DEFAULT_META_DESCRIPTION =
+  "Home Style: contemporary furniture in Egypt. Discover sofas, bedrooms, dining rooms, and home furniture.";
+
+const normalizeMetaDescription = (value?: string | null) => {
+  const normalized = value?.replace(/\s+/g, " ").trim();
+  if (!normalized) return DEFAULT_META_DESCRIPTION;
+  return normalized.length <= 160
+    ? normalized
+    : `${normalized.slice(0, 157).trimEnd()}...`;
+};
+
+function RouteMeta({
+  pathname,
+  product,
+}: {
+  pathname: string;
+  product: Product | null;
+}) {
+  const normalizedPath = normalizePath(pathname);
+  const categorySlug = categorySlugFromPath(normalizedPath);
+  const isProductPage = Boolean(productSlugFromPath(normalizedPath));
+  const noIndexPaths = new Set([
+    "/cart",
+    "/checkout",
+    "/wishlist",
+    "/orders",
+    "/track",
+    "/login",
+    "/register",
+    "/logout",
+    "/admin",
+    "/analytics",
+  ]);
+  const isNoIndex =
+    noIndexPaths.has(normalizedPath) ||
+    normalizedPath.startsWith("/admin-panel");
+
+  let title = "Home Style | Furniture in Egypt";
+  let description = DEFAULT_META_DESCRIPTION;
+  let image = heroImage;
+
+  if (isProductPage && product) {
+    title = `${product.title} | Home Style`;
+    description = normalizeMetaDescription(
+      `${product.title}. ${product.description ?? ""}`,
+    );
+    image = resolveAssetUrl(getImageUrl(product.images)) ?? heroImage;
+  } else if (normalizedPath === "/products" || normalizedPath === "/") {
+    title = "Home Style";
+    description =
+      "Explore Home Style collections in Egypt: sofas, bedrooms, dining rooms, and modern home furniture.";
+  } else if (categorySlug) {
+    const categoryTitle = categorySlug.replaceAll("-", " ");
+    title = `${categoryTitle} Furniture | Home Style`;
+    description = `Explore ${categoryTitle} furniture from Home Style in Egypt.`;
+  } else if (normalizedPath === "/about") {
+    title = "About Home Style";
+    description =
+      "Learn about Home Style and browse furniture selected for modern homes in Egypt.";
+  }
+
+  const canonical = `${SITE_ORIGIN}${normalizedPath === "/" ? "/" : normalizedPath}`;
+  const productSchema =
+    isProductPage && product
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.title,
+          description: normalizeMetaDescription(product.description),
+          image: [image],
+          sku: product.id,
+          category: product.category_name,
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "EGP",
+            price: Number(product.final_price),
+            availability: product.is_available === false
+              ? "https://schema.org/OutOfStock"
+              : "https://schema.org/InStock",
+            url: canonical,
+          },
+        }
+      : null;
+
+  return (
+    <Helmet>
+      <html lang="ar" dir="rtl" />
+      <title>{title}</title>
+      <meta name="description" content={description} />
+      <meta name="robots" content={isNoIndex ? "noindex, nofollow" : "index, follow"} />
+      <link rel="canonical" href={canonical} />
+      <meta property="og:type" content={productSchema ? "product" : "website"} />
+      <meta property="og:site_name" content="Home Style" />
+      <meta property="og:title" content={title} />
+      <meta property="og:description" content={description} />
+      <meta property="og:url" content={canonical} />
+      <meta property="og:image" content={image} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={title} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={image} />
+      {productSchema && (
+        <script type="application/ld+json">
+          {JSON.stringify(productSchema)}
+        </script>
+      )}
+    </Helmet>
+  );
+}
 
 const safeJson = async (response: Response) => {
   const text = await response.text();
@@ -469,6 +672,7 @@ const normalizeConversation = (
 });
 
 let refreshPromise: Promise<string | null> | null = null;
+let identityPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("furniture_refresh_token");
@@ -510,6 +714,9 @@ const getStoredIdentityToken = () =>
 const setStoredIdentity = (identifier: string, identityToken: string) => {
   localStorage.setItem("furniture_identifier", identifier);
   localStorage.setItem("furniture_identity_token", identityToken);
+  window.dispatchEvent(
+    new CustomEvent(FURNITURE_IDENTITY_READY_EVENT, { detail: identityToken }),
+  );
 };
 
 async function request<T>(path: string, init: RequestInit = {}, isRetry = false) {
@@ -524,11 +731,19 @@ async function request<T>(path: string, init: RequestInit = {}, isRetry = false)
     path.startsWith("/api/auth/logout/") ||
     path.startsWith("/api/orders/mine/");
 
+  const requestBody = typeof init.body === "string" ? init.body : "";
+  const hasGuestIdentityToken =
+    path.includes("identity_token=") ||
+    /"identity_token"\s*:\s*"[^"]+"/.test(requestBody) ||
+    (init.body instanceof FormData &&
+      typeof init.body.get("identity_token") === "string" &&
+      Boolean(init.body.get("identity_token")));
   const shouldSendOptionalAuth =
-  Boolean(authHeaders.Authorization) &&
-  (path === "/api/orders/" ||
-    path.startsWith("/api/chat/") ||
-    path.startsWith("/api/catalog/favorites/"));
+    Boolean(authHeaders.Authorization) &&
+    !hasGuestIdentityToken &&
+    (path === "/api/orders/" ||
+      path.startsWith("/api/chat/") ||
+      path.startsWith("/api/catalog/favorites/"));
 
   if (requiresAuth || shouldSendOptionalAuth) {
     Object.entries(authHeaders).forEach(([key, value]) => {
@@ -583,24 +798,35 @@ const api = {
   async getProduct(slug: string) {
     return request<Product>(`/api/catalog/products/${slug}/`);
   },
-  async startChat(product?: Product, forceNew = false) {
-    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
-    const identityToken = isAuthenticated ? null : await this.ensureIdentity();
+  async startChat({
+    product,
+    context,
+    identityToken,
+    forceNew = false,
+  }: {
+    product?: Product;
+    context: ChatContext;
+    identityToken?: string;
+    forceNew?: boolean;
+  }): Promise<ChatSession> {
+    const resolvedIdentityToken = identityToken ?? await this.ensureIdentity();
 
     const payload = await request<
-  Record<string, string> & {
-    identifier?: string;
-    identity_token?: string;
-    customer_identifier?: string;
-  }
->("/api/chat/start/", {
+      Record<string, string> & {
+        id?: string;
+        conversation_id?: string;
+        identity_token?: string;
+        customer_identifier?: string;
+      }
+    >("/api/chat/start/", {
       method: "POST",
       body: JSON.stringify({
-        identity_token: identityToken,
+        identity_token: resolvedIdentityToken,
         customer_name:
           localStorage.getItem("furniture_customer_name") ?? "Guest Customer",
         product_id: product?.id,
         force_new: forceNew,
+        context,
       }),
     });
 
@@ -611,37 +837,50 @@ const api = {
     const conversationId = payload?.id ?? payload?.conversation_id;
     if (!conversationId)
       throw new Error("Chat start response did not include a conversation id.");
-    return conversationId;
+    return {
+      conversationId,
+      identityToken: payload?.identity_token ?? resolvedIdentityToken,
+    };
   },
   async sendChatMessage(
-  conversationId: string,
-  payload: { message: string; sender_type: "customer"; context: ChatContext },
-  images: File[] = [],
-) {
-  const isAuthenticated = Boolean(getAuthHeaders().Authorization);
-  const identityToken = isAuthenticated ? null : getStoredIdentityToken();
-  const form = new FormData();
-  form.append("message", payload.message);
-  form.append("sender_type", payload.sender_type);
-  form.append("context", JSON.stringify(payload.context));
-  if (identityToken) form.append("identity_token", identityToken);
-  images.forEach((image) => form.append("images", image));
-  return request<{ messages: ChatMessage[]; agent_error?: string }>(
-    `/api/chat/${conversationId}/send/`,
-    {
+    conversationId: string,
+    payload: { message: string; sender_type: "customer"; context: ChatContext },
+    images: File[] = [],
+    identityToken = "",
+  ) {
+    const form = new FormData();
+    form.append("message", payload.message);
+    form.append("sender_type", payload.sender_type);
+    form.append("context", JSON.stringify(payload.context));
+    if (identityToken) form.append("identity_token", identityToken);
+    images.forEach((image) => form.append("images", image));
+    return request<{ messages: ChatMessage[]; agent_error?: string }>(
+      `/api/chat/${conversationId}/send/`,
+      {
+        method: "POST",
+        body: form,
+      },
+    );
+  },
+  async getChatHistory(conversationId: string, identityToken = "") {
+    const query = identityToken
+      ? `?identity_token=${encodeURIComponent(identityToken)}`
+      : "";
+    const payload = await request<{ conversation_status: string; messages: ChatMessage[] }>(
+      `/api/chat/${conversationId}/history/${query}`,
+    );
+    return { ...payload, messages: payload.messages.map(normalizeMessage) };
+  },
+  async updateChatContext(
+    conversationId: string,
+    context: ChatContext,
+    identityToken = "",
+  ) {
+    return request(`/api/chat/${conversationId}/context/`, {
       method: "POST",
-      body: form,
-    },
-  );
-},
-  async getChatHistory(conversationId: string) {
-  const isAuthenticated = Boolean(getAuthHeaders().Authorization);
-  const identityToken = isAuthenticated ? "" : getStoredIdentityToken() ?? "";
-  const payload = await request<{ conversation_status: string; messages: ChatMessage[] }>(
-    `/api/chat/${conversationId}/history/?identity_token=${encodeURIComponent(identityToken)}`,
-  );
-  return { ...payload, messages: payload.messages.map(normalizeMessage) };
-},
+      body: JSON.stringify({ context, identity_token: identityToken }),
+    });
+  },
   async fetchProductCards(endpoint: string) {
     return request<{ products: ChatProductCard[] }>(endpoint);
   },
@@ -717,17 +956,26 @@ const api = {
     });
   },
   async ensureIdentity() {
-  const existingToken = getStoredIdentityToken();
-  const payload = await request<{ identifier: string; identity_token: string }>(
-    "/api/auth/identity/",
-    {
-      method: "POST",
-      body: JSON.stringify(existingToken ? { identity_token: existingToken } : {}),
-    },
-  );
-  setStoredIdentity(payload.identifier, payload.identity_token);
-  return payload.identity_token;
-},
+    if (!identityPromise) {
+      identityPromise = (async () => {
+        const existingToken = getStoredIdentityToken();
+        const payload = await request<{
+          identifier: string;
+          identity_token: string;
+        }>("/api/auth/identity/", {
+          method: "POST",
+          body: JSON.stringify(
+            existingToken ? { identity_token: existingToken } : {},
+          ),
+        });
+        setStoredIdentity(payload.identifier, payload.identity_token);
+        return payload.identity_token;
+      })().finally(() => {
+        identityPromise = null;
+      });
+    }
+    return identityPromise;
+  },
   async getAgentSettings() {
     return request<AgentSettingsState>("/api/admin/agent-settings/");
   },
@@ -796,8 +1044,11 @@ const api = {
   async markAdminChatRead(conversationId: string) {
     return request(`/api/admin/chats/${conversationId}/mark_read/`, { method: "PATCH", body: JSON.stringify({}) });
   },
-  async getCustomerUnread() {
-    return request<{ unread_count: number }>(`/api/chat/unread/?identity_token=${encodeURIComponent(getStoredIdentityToken() ?? "")}`);
+  async getCustomerUnread(identityToken = "") {
+    const query = identityToken
+      ? `?identity_token=${encodeURIComponent(identityToken)}`
+      : "";
+    return request<{ unread_count: number }>(`/api/chat/unread/${query}`);
   },
   async getPushConfig() {
     return request<{ vapid_public_key: string }>("/api/chat/push-config/");
@@ -805,22 +1056,46 @@ const api = {
   async savePushSubscription(subscription: PushSubscriptionJSON) {
     return request("/api/chat/push-subscriptions/", { method: "POST", body: JSON.stringify(subscription) });
   },
-async toggleFavorite(productId: string, identityToken: string) {
-  return request<{ message?: string } | { id: string; product: string; customer_identifier: string; created_at: string }>("/api/catalog/favorites/toggle/", {
-    method: "POST",
-    body: JSON.stringify({ product_id: productId, identity_token: identityToken }),
-  });
-},
-async checkFavorite(productId: string, identityToken: string) {
-  return request<{ is_favorited: boolean }>(
-    `/api/catalog/favorites/check/?product_id=${encodeURIComponent(productId)}&identity_token=${encodeURIComponent(identityToken)}`,
-  );
-},
-async listFavorites(identityToken: string) {
-  return request<Array<{ id: string; product: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>(
-    `/api/catalog/favorites/?identity_token=${encodeURIComponent(identityToken)}`,
-  );
-},
+  async toggleFavorite(productId: string, identityToken: string) {
+    const payload = identityToken
+      ? { product_id: productId, identity_token: identityToken }
+      : { product_id: productId };
+    return request<
+      | { message?: string }
+      | {
+          id: string;
+          product: string;
+          customer_identifier: string;
+          created_at: string;
+        }
+    >("/api/catalog/favorites/toggle/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  async checkFavorite(productId: string, identityToken: string) {
+    const query = new URLSearchParams({ product_id: productId });
+    if (identityToken) query.set("identity_token", identityToken);
+    return request<{ is_favorited: boolean }>(
+      `/api/catalog/favorites/check/?${query.toString()}`,
+    );
+  },
+  async listFavorites(identityToken: string) {
+    const query = identityToken
+      ? `?identity_token=${encodeURIComponent(identityToken)}`
+      : "";
+    return request<
+      Array<{
+        id: string;
+        product: string;
+        product_title: string;
+        product_slug: string;
+        product_final_price: string;
+        customer_identifier: string;
+        created_at: string;
+      }>
+    >(`/api/catalog/favorites/${query}`);
+  },
   async uploadAgentImages(files: FileList) {
     const form = new FormData();
     Array.from(files).forEach((file) => form.append("images", file));
@@ -891,13 +1166,19 @@ const vapidKeyToUint8Array = (value: string) => {
 };
 
 function App() {
-  const [hash, setHash] = useState(window.location.hash || "#catalog");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hash = routeHashFromPath(location.pathname);
+  const routeProductSlug = productSlugFromPath(location.pathname);
+  const routeCategorySlug = categorySlugFromPath(location.pathname);
   const [products, setProducts] = useState<Product[]>([]);
   useEffect(() => {
     productsRef.current = products;
   }, [products]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [materialFilter, setMaterialFilter] = useState("");
@@ -917,11 +1198,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const { cart, setCart } = useCart();
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [locationModalOpen, setLocationModalOpen] = useState(false);
-  const [selectedShippingLocation, setSelectedShippingLocation] = useState<string | null>(null);
   const [orderResult, setOrderResult] = useState<Order | null>(null);
   const [trackingNumber, setTrackingNumber] = useState("");
   const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
@@ -960,6 +1240,7 @@ function App() {
   const [savedScrollPos, setSavedScrollPos] = useState(0);
   const [customerProfile, setCustomerProfile] =
     useState<CustomerProfile | null>(null);
+  const [customerProfileReady, setCustomerProfileReady] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
@@ -1006,7 +1287,7 @@ function App() {
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteClicks, setFavoriteClicks] = useState<Record<string, number>>({});
   const [favoritesDropdownOpen, setFavoritesDropdownOpen] = useState(false);
-  const [favoriteProducts, setFavoriteProducts] = useState<Array<{ id: string; product_title: string; product_slug: string; product_final_price: string; customer_identifier: string; created_at: string }>>([]);
+  const [favoriteProducts, setFavoriteProducts] = useState<FavoriteProduct[]>([]);
   const [favoriteProductDetails, setFavoriteProductDetails] = useState<Record<string, Product>>({});
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [adminAgentMessages, setAdminAgentMessages] = useState<ChatMessage[]>([
@@ -1020,33 +1301,66 @@ function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const chatImageInputRef = useRef<HTMLInputElement | null>(null);
   const adminReplyImageInputRef = useRef<HTMLInputElement | null>(null);
+  const categoriesRef = useRef<Category[]>([]);
   const productsRef = useRef<Product[]>([]);
   const favoriteDetailsFetchedRef = useRef<Set<string>>(new Set());
+  const navigationHistoryRef = useRef<BrowsingEvent[]>(readNavigationHistory());
 
   const isAnalyticsRoute = hash === "#analytics";
   const isAdminRoute =
-    hash === "#admin" || window.location.pathname.startsWith("/admin-panel");
+    hash === "#admin" || location.pathname.startsWith("/admin-panel");
   const isAuthRoute =
     hash === "#login" || hash === "#register" || hash === "#logout";
   const hasAuthToken = Boolean(localStorage.getItem("furniture_access_token"));
   const hasAdminToken = hasAuthToken && customerProfile?.role === "admin";
+  const setHash = useCallback(
+    (nextHash: string) => {
+      navigate(pathFromHash(nextHash, activeProduct));
+    },
+    [activeProduct, navigate],
+  );
+
   useEffect(() => {
     document.documentElement.dir = "rtl";
     document.documentElement.lang = "ar";
   }, []);
 
   useEffect(() => {
-  const syncHash = () => {
-    setHash(window.location.hash || "#catalog");
+    if (!location.hash) return;
+    navigate(pathFromHash(location.hash, activeProduct), { replace: true });
+  }, [activeProduct, location.hash, navigate]);
+
+  useEffect(() => {
+    if (!routeCategorySlug) return;
+    setSelectedCategory((current) =>
+      current === routeCategorySlug ? current : routeCategorySlug,
+    );
+  }, [routeCategorySlug]);
+
+  useEffect(() => {
+    if (location.pathname === "/cart") {
+      setCartOpen(true);
+    } else if (location.pathname === "/wishlist") {
+      setFavoritesDropdownOpen(true);
+    } else if (location.pathname === "/about") {
+      setAboutModalOpen(true);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const pagePath = `${location.pathname}${location.search}`;
     if (typeof window.fbq === "function") {
       window.fbq("track", "PageView");
     }
-    trackVisit(window.location.hash || '#catalog');
-  };
-  trackVisit(window.location.hash || '#catalog');
-  window.addEventListener("hashchange", syncHash);
-  return () => window.removeEventListener("hashchange", syncHash);
-}, []);
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "page_view", {
+        page_path: pagePath,
+        page_location: window.location.href,
+        page_title: document.title,
+      });
+    }
+    trackVisit(pagePath);
+  }, [location.pathname, location.search]);
 
   // Clear search when navigating away from catalog
   useEffect(() => {
@@ -1090,7 +1404,10 @@ function App() {
     setApiError("");
 
     try {
-      const params = new URLSearchParams({ page: currentPage.toString() });
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        page_size: String(CATALOG_PAGE_SIZE),
+      });
       if (selectedCategory) params.set("category", selectedCategory);
       if (materialFilter.trim()) params.set("material", materialFilter.trim());
       if (depositFilter) params.set("has_deposit", depositFilter);
@@ -1103,8 +1420,11 @@ function App() {
       if (maxPriceFilter.trim()) params.set("max_price", maxPriceFilter.trim());
       if (searchQuery.trim()) params.set("search", searchQuery.trim());
 
+      const categoryRequest = categoriesRef.current.length
+        ? Promise.resolve(categoriesRef.current)
+        : api.listCategories().catch(() => []);
       const [categoryPayload, productPayload] = await Promise.all([
-        api.listCategories().catch(() => []),
+        categoryRequest,
         api.listProducts(params),
       ]);
 
@@ -1115,13 +1435,18 @@ function App() {
         setTotalProducts(productPayload.length);
       } else {
         productResults = productPayload.results || [];
-        setTotalPages(Math.ceil((productPayload.count || 0) / 12) || 1);
+        setTotalPages(
+          Math.ceil((productPayload.count || 0) / CATALOG_PAGE_SIZE) || 1,
+        );
         setTotalProducts(productPayload.count || 0);
       }
 
+      categoriesRef.current = categoryPayload;
       setCategories(categoryPayload);
       setProducts(productResults);
-      setActiveProduct((current) => current ?? productResults[0] ?? null);
+      setActiveProduct((current) =>
+        routeProductSlug ? current : current ?? productResults[0] ?? null,
+      );
     } catch (error) {
       setProducts([]);
       setActiveProduct(null);
@@ -1142,11 +1467,13 @@ function App() {
     shippingFilter,
     searchQuery,
     currentPage,
+    routeProductSlug,
   ]);
 
   const loadCustomerProfile = useCallback(async () => {
     if (!localStorage.getItem("furniture_access_token")) {
       setCustomerProfile(null);
+      setCustomerProfileReady(true);
       return;
     }
 
@@ -1163,6 +1490,8 @@ function App() {
       }
     } catch {
       setCustomerProfile(null);
+    } finally {
+      setCustomerProfileReady(true);
     }
   }, []);
 
@@ -1181,8 +1510,13 @@ function App() {
     }
   }, [customerProfile]);
 
+  const getChatIdentityToken = useCallback(async () => {
+    return customerProfile ? "" : getCustomerIdentifier();
+  }, [customerProfile, getCustomerIdentifier]);
+
   const loadFavorites = useCallback(async () => {
-    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+    if (!customerProfileReady) return;
+    const isAuthenticated = Boolean(customerProfile);
     const customerIdentifier = isAuthenticated ? "" : await getCustomerIdentifier();
     if (!isAuthenticated && !customerIdentifier) return;
 
@@ -1221,10 +1555,10 @@ function App() {
     } finally {
       setFavoritesLoading(false);
     }
-  }, [getCustomerIdentifier]);
+  }, [customerProfile, customerProfileReady, getCustomerIdentifier]);
 
   const toggleFavorite = useCallback(async (productId: string) => {
-    const isAuthenticated = Boolean(getAuthHeaders().Authorization);
+    const isAuthenticated = Boolean(customerProfile);
     const customerIdentifier = isAuthenticated ? "" : await getCustomerIdentifier();
     if (!isAuthenticated && !customerIdentifier) return;
 
@@ -1251,15 +1585,13 @@ function App() {
     } catch (error) {
       console.error("Failed to toggle favorite:", error);
     }
-  }, [getCustomerIdentifier, favoriteClicks, loadFavorites]);
+  }, [customerProfile, getCustomerIdentifier, favoriteClicks, loadFavorites]);
 
   useEffect(() => {
-    loadFavorites();
-  }, [loadFavorites]);
-
-  useEffect(() => {
-    loadProducts();
-  }, [loadProducts]);
+    if (hash === "#catalog") {
+      loadProducts();
+    }
+  }, [hash, loadProducts]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1270,7 +1602,9 @@ function App() {
   useEffect(() => {
     if (!conversationId) return;
 
-    const accessToken = localStorage.getItem("furniture_access_token");
+    const accessToken = customerProfile
+      ? localStorage.getItem("furniture_access_token")
+      : null;
     const wsUrl = accessToken 
       ? `${WS_BASE_URL}/ws/chat/${conversationId}/?token=${accessToken}`
       : `${WS_BASE_URL}/ws/chat/${conversationId}/`;
@@ -1320,14 +1654,15 @@ function App() {
       setChatConnected(false);
       socket.close();
     };
-  }, [conversationId]);
+  }, [conversationId, customerProfile]);
 
   useEffect(() => {
     if (!chatOpen || !conversationId) return;
 
     const refreshHistory = async () => {
       try {
-        const history = await api.getChatHistory(conversationId);
+        const identityToken = await getChatIdentityToken();
+        const history = await api.getChatHistory(conversationId, identityToken);
         setMessages((current) => {
           const currentKey = current.map((message) => message.id).join("|");
           const nextKey = history.messages
@@ -1343,7 +1678,7 @@ function App() {
     refreshHistory();
     const timer = window.setInterval(refreshHistory, 3500);
     return () => window.clearInterval(timer);
-  }, [chatOpen, conversationId]);
+  }, [chatOpen, conversationId, getChatIdentityToken]);
 
   useEffect(() => {
     messages.forEach((message) => {
@@ -1410,12 +1745,32 @@ function App() {
   }, [adminOrderStatusFilter, commissionFilter]);
 
   useEffect(() => {
-    if (hasAdminToken || chatOpen) return;
-    const refresh = () => api.getCustomerUnread().then((data) => setCustomerUnreadCount(data.unread_count ?? 0)).catch(() => undefined);
+    if (hasAdminToken || chatOpen || !customerProfileReady) return;
+    let cancelled = false;
+    const refresh = async () => {
+      const identityToken = customerProfile ? "" : await getCustomerIdentifier();
+      if (!customerProfile && !identityToken) return;
+
+      try {
+        const data = await api.getCustomerUnread(identityToken);
+        if (!cancelled) setCustomerUnreadCount(data.unread_count ?? 0);
+      } catch {
+        // A failed background badge refresh should not affect the storefront.
+      }
+    };
     refresh();
     const timer = window.setInterval(refresh, 12000);
-    return () => window.clearInterval(timer);
-  }, [chatOpen, hasAdminToken]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    chatOpen,
+    customerProfile,
+    customerProfileReady,
+    getCustomerIdentifier,
+    hasAdminToken,
+  ]);
 
   useEffect(() => {
     if (isAdminRoute && hasAdminToken) {
@@ -1485,21 +1840,104 @@ const mainTab = useMemo<
   useEffect(() => {
   if (mainTab !== "notfound") return;
   const timer = window.setTimeout(() => {
-    window.location.hash = "#catalog";
+    navigate("/products");
   }, 4000);
   return () => window.clearTimeout(timer);
-}, [mainTab]);
+}, [mainTab, navigate]);
+
+  useEffect(() => {
+    if (mainTab !== "details" || !routeProductSlug) return;
+
+    let cancelled = false;
+
+    const loadProductFromRoute = async () => {
+      setDetailsLoading(true);
+      setDetailsError("");
+      try {
+        const product = await api.getProduct(routeProductSlug);
+        if (cancelled) return;
+        setActiveProduct(product);
+        setActiveImageIndex(0);
+        setDetailSelectedVariant(pickDefaultVariant(product));
+        trackFunnelEvent("product_view", product.id);
+      } catch (error) {
+        if (cancelled) return;
+        setActiveProduct(null);
+        setDetailsError(
+          error instanceof Error
+            ? error.message
+            : "Could not load product details.",
+        );
+      } finally {
+        if (!cancelled) setDetailsLoading(false);
+      }
+    };
+
+    loadProductFromRoute();
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab, routeProductSlug]);
 
   const chatContext = useMemo<ChatContext>(() => {
-    if (!activeProduct) return { current_page: window.location.pathname };
-
-    return {
-      current_page: `/products/${activeProduct.slug}`,
-      product_id: activeProduct.id,
-      product_name: activeProduct.title,
-      category_name: activeProduct.category_name,
+    const currentPage = `${location.pathname}${location.search}`;
+    const context: ChatContext = {
+      current_page: currentPage,
+      page_type: pageTypeFromPath(location.pathname),
     };
-  }, [activeProduct]);
+    if (mainTab === "details" && activeProduct) {
+      context.product_id = activeProduct.id;
+      context.product_slug = activeProduct.slug;
+      context.product_name = activeProduct.title;
+      context.category_name = activeProduct.category_name;
+    }
+    return context;
+  }, [activeProduct, location.pathname, location.search, mainTab]);
+
+  const recordNavigation = useCallback((context: ChatContext) => {
+    const { recent_navigation: _recentNavigation, ...event } = context;
+    const nextEvent: BrowsingEvent = {
+      ...event,
+      visited_at: new Date().toISOString(),
+    };
+    const current = navigationHistoryRef.current;
+    const last = current.at(-1);
+    const samePage =
+      last?.current_page === nextEvent.current_page &&
+      last?.page_type === nextEvent.page_type;
+    const nextHistory = samePage
+      ? [...current.slice(0, -1), { ...last, ...nextEvent }]
+      : [...current, nextEvent];
+    navigationHistoryRef.current = nextHistory.slice(-12);
+    sessionStorage.setItem(
+      NAVIGATION_HISTORY_KEY,
+      JSON.stringify(navigationHistoryRef.current),
+    );
+    return navigationHistoryRef.current;
+  }, []);
+
+  const withNavigationHistory = useCallback((context: ChatContext): ChatContext => ({
+    ...context,
+    recent_navigation: navigationHistoryRef.current,
+  }), []);
+
+  useEffect(() => {
+    const history = recordNavigation(chatContext);
+    if (!conversationId) return;
+
+    let cancelled = false;
+    void (async () => {
+      const identityToken = await getChatIdentityToken();
+      if (cancelled) return;
+      await api.updateChatContext(conversationId, {
+        ...chatContext,
+        recent_navigation: history,
+      }, identityToken).catch(() => undefined);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatContext, conversationId, getChatIdentityToken, recordNavigation]);
 
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
@@ -1605,31 +2043,18 @@ const mainTab = useMemo<
 
 const openProductDetails = async (product: Product) => {
   setSavedScrollPos(window.scrollY);
-    trackFunnelEvent('product_view', product.id);
   setActiveProduct(product);
   setActiveImageIndex(0);
   setDetailSelectedVariant(pickDefaultVariant(product)); 
-  window.history.replaceState(null, "", `/products/${product.slug}#details`);
-  setHash("#details");
+  setDetailsError("");
+  navigate(`/product/${encodeURIComponent(product.slug)}`);
   window.setTimeout(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, 0);
-
-  try {
-    const trackedProduct = await api.getProduct(product.slug);
-    setActiveProduct(trackedProduct);
-    setDetailSelectedVariant(pickDefaultVariant(trackedProduct));
-  } catch (error) {
-    setToast({
-      tone: "error",
-      text: `Could not load product details: ${error instanceof Error ? error.message : "Unknown error"}`,
-    });
-  }
 };
 
 const closeProductDetails = () => {
-  window.history.pushState(null, "", "/#catalog");
-  setHash("#catalog");
+  navigate("/products");
   setActiveProduct(null);
   setDetailSelectedVariant(null); 
   window.setTimeout(() => {
@@ -1663,6 +2088,7 @@ const selectProductSize = (product: Product, variant: ProductVariant) => {
 };
 const openCheckout = () => {
   trackFunnelEvent('checkout_start');
+  navigate("/checkout");
   setCheckoutOpen(true);
 };
 
@@ -1728,19 +2154,40 @@ const addItemToCart = (
   };
 
   const openContextChat = async (product?: Product) => {
-    const contextProduct = product ?? activeProduct ?? undefined;
+    const contextProduct = product ?? (
+      mainTab === "details" ? activeProduct ?? undefined : undefined
+    );
     if (contextProduct) setActiveProduct(contextProduct);
     setChatOpen(true);
     setChatError("");
     void enablePushNotifications().catch(() => undefined);
 
     try {
-      const id = await api.startChat(contextProduct);
-      if (conversationId && conversationId !== id) {
+      const identityToken = await getChatIdentityToken();
+      const context = withNavigationHistory({
+        ...chatContext,
+        ...(contextProduct
+          ? {
+              product_id: contextProduct.id,
+              product_slug: contextProduct.slug,
+              product_name: contextProduct.title,
+              category_name: contextProduct.category_name,
+            }
+          : {}),
+      });
+      const session = await api.startChat({
+        product: contextProduct,
+        context,
+        identityToken,
+      });
+      if (conversationId && conversationId !== session.conversationId) {
         socketRef.current?.close();
       }
-      setConversationId(id);
-      const history = await api.getChatHistory(id);
+      setConversationId(session.conversationId);
+      const history = await api.getChatHistory(
+        session.conversationId,
+        session.identityToken,
+      );
       if (history.messages.length) {
         setMessages(history.messages);
       }
@@ -1783,24 +2230,29 @@ const addItemToCart = (
     const payload = {
       message,
       sender_type: "customer",
-      context: chatContext,
+      context: withNavigationHistory(chatContext),
     } as const;
 
     try {
       let activeConversationId = conversationId;
+      let identityToken = await getChatIdentityToken();
 
       if (!activeConversationId) {
-        activeConversationId = await api.startChat(activeProduct ?? undefined);
-        setConversationId(activeConversationId);
+        const session = await api.startChat({
+          product: mainTab === "details" ? activeProduct ?? undefined : undefined,
+          context: payload.context,
+          identityToken,
+        });
+        activeConversationId = session.conversationId;
+        identityToken = session.identityToken;
+        setConversationId(session.conversationId);
       }
 
       if (socketRef.current?.readyState === WebSocket.OPEN && chatImages.length === 0) {
         socketRef.current.send(
   JSON.stringify({
     ...payload,
-    identity_token: customerProfile
-      ? null
-      : localStorage.getItem("furniture_identity_token"),
+    ...(identityToken ? { identity_token: identityToken } : {}),
   }),
 );
       } else {
@@ -1808,6 +2260,7 @@ const addItemToCart = (
           activeConversationId,
           payload,
           chatImages,
+          identityToken,
         );
         setMessages((current) => [
           ...current,
@@ -1963,7 +2416,6 @@ const addItemToCart = (
 
   const resetChat = async () => {
     setChatOpen(false);
-    return;
     socketRef.current?.close();
     setConversationId(null);
     setChatConnected(false);
@@ -1977,8 +2429,14 @@ const addItemToCart = (
       },
     ]);
     try {
-      const id = await api.startChat(activeProduct ?? undefined, true);
-      setConversationId(id);
+      const identityToken = await getChatIdentityToken();
+      const session = await api.startChat({
+        product: mainTab === "details" ? activeProduct ?? undefined : undefined,
+        context: withNavigationHistory(chatContext),
+        identityToken,
+        forceNew: true,
+      });
+      setConversationId(session.conversationId);
     } catch (error) {
       setChatError(
         error instanceof Error ? error.message : "Could not reset chat.",
@@ -2075,7 +2533,7 @@ const addItemToCart = (
     setTrackingNumber(orderNumber);
     try {
       setTrackedOrder(await api.trackOrder(orderNumber));
-      window.location.hash = "#track";
+      navigate("/track");
       setToast({ tone: "success", text: "تم تحميل حالة الطلب" });
     } catch (error) {
       setToast({
@@ -2119,7 +2577,7 @@ const addItemToCart = (
       );
       setAuthPassword("");
       await loadCustomerProfile();
-      window.location.hash = "#orders";
+      navigate("/orders");
       setToast({ tone: "success", text: "تم تسجيل الدخول بنجاح" });
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "فشل تسجيل الدخول");
@@ -2149,7 +2607,7 @@ const addItemToCart = (
       );
       setAuthPassword("");
       await loadCustomerProfile();
-      window.location.hash = "#orders";
+      navigate("/orders");
       setToast({ tone: "success", text: "تم إنشاء الحساب بنجاح" });
     } catch (error) {
       let errorMessage = "حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى.";
@@ -2170,7 +2628,7 @@ const addItemToCart = (
       setAuthError(errorMessage);
       if (shouldSwitchToLogin) {
         setTimeout(() => {
-          window.location.hash = "#login";
+          navigate("/login");
           setAuthError("");
         }, 2000);
       }
@@ -2185,7 +2643,7 @@ const addItemToCart = (
     setCustomerProfile(null);
     setMyOrders([]);
     setToast({ tone: "success", text: "تم تسجيل الخروج" });
-    window.location.hash = "#catalog";
+    navigate("/products");
   };
 
   const updateAgentMode = async (payload: Partial<AgentSettingsState>) => {
@@ -2332,9 +2790,9 @@ const addItemToCart = (
       return (
         <main className="site-shell">
           <header className="nav-bar">
-            <a className="brand" href="#catalog">
+            <Link className="brand" to="/products">
               <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
-            </a>
+            </Link>
           </header>
           <section className="auth-section">
             <div className="admin-card login-card">
@@ -2360,13 +2818,13 @@ const addItemToCart = (
     return (
       <main className="site-shell">
         <header className="nav-bar">
-          <a className="brand" href="#catalog">
+          <Link className="brand" to="/products">
             <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
-          </a>
+          </Link>
           <nav aria-label="Auth navigation">
-            <a href="#catalog">Catalog</a>
-            <a href="#login">Login</a>
-            <a href="#register">Register</a>
+            <Link to="/products">Catalog</Link>
+            <Link to="/login">Login</Link>
+            <Link to="/register">Register</Link>
           </nav>
         </header>
         <section className="auth-section">
@@ -2397,7 +2855,7 @@ const addItemToCart = (
                 aria-selected={!isRegister}
                 className={!isRegister ? "active" : ""}
                 onClick={() => {
-                  window.location.hash = "#login";
+                  navigate("/login");
                 }}
               >
                 تسجيل الدخول
@@ -2408,7 +2866,7 @@ const addItemToCart = (
                 aria-selected={isRegister}
                 className={isRegister ? "active" : ""}
                 onClick={() => {
-                  window.location.hash = "#register";
+                  navigate("/register");
                 }}
               >
                 إنشاء حساب
@@ -2491,9 +2949,9 @@ const addItemToCart = (
 
             <p className="auth-switch-text">
               {isRegister ? "لديك حساب بالفعل؟" : "معندكش حساب؟"}{" "}
-              <a href={isRegister ? "#login" : "#register"}>
+              <Link to={isRegister ? "/login" : "/register"}>
                 {isRegister ? "تسجيل الدخول" : "إنشاء حساب"}
-              </a>
+              </Link>
             </p>
           </div>
         </section>
@@ -2506,12 +2964,12 @@ const addItemToCart = (
       return (
         <main className="site-shell admin-shell">
           <header className="nav-bar">
-            <a className="brand" href="#catalog">
+            <Link className="brand" to="/products">
               <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
-            </a>
+            </Link>
             <nav aria-label="Admin navigation">
-              <a href="#catalog">المتجر</a>
-              <a href="#admin">لوحة الإدارة</a>
+              <Link to="/products">المتجر</Link>
+              <Link to="/admin">لوحة الإدارة</Link>
             </nav>
           </header>
           <section className="auth-section">
@@ -2547,7 +3005,7 @@ const addItemToCart = (
     }
 
     return (
-      <AnalyticsDashboard onBack={() => { window.location.hash = '#catalog'; setHash('#catalog'); }} />
+      <AnalyticsDashboard onBack={() => setHash("#catalog")} />
     );
   }
 
@@ -2555,13 +3013,13 @@ const addItemToCart = (
     return (
       <main className="site-shell admin-shell">
         <header className="nav-bar">
-          <a className="brand" href="#catalog">
+          <Link className="brand" to="/products">
             <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
-          </a>
+          </Link>
           <nav aria-label="Admin navigation">
-            <a href="#catalog">Storefront</a>
-            <a href="#admin">Admin Panel</a>
-            <a href="#analytics">لوحة التحليلات</a>
+            <Link to="/products">Storefront</Link>
+            <Link to="/admin">Admin Panel</Link>
+            <Link to="/analytics">لوحة التحليلات</Link>
           </nav>
           <div className="nav-actions">
             {hasAdminToken && (
@@ -3255,11 +3713,23 @@ const addItemToCart = (
   }
 
   return (
+    <WishlistProvider
+      favorites={favorites}
+      favoritesLoading={favoritesLoading}
+      favoriteProducts={favoriteProducts}
+      favoriteProductDetails={favoriteProductDetails}
+      toggleFavorite={toggleFavorite}
+      refreshFavorites={loadFavorites}
+    >
+    <RouteMeta
+      pathname={location.pathname}
+      product={mainTab === "details" ? activeProduct : null}
+    />
     <main className="site-shell">
       <header className="nav-bar">
-        <a className="brand" href="/">
+        <Link className="brand" to="/products">
           <img src="/favicon.svg" alt="Home Style" className="brand-logo" />
-        </a>
+        </Link>
         <button
           type="button"
           className="mobile-menu-btn"
@@ -3273,34 +3743,34 @@ const addItemToCart = (
           aria-label="Primary navigation"
           className={mobileMenuOpen ? "mobile-open" : ""}
         >
-          <a
-            href="#catalog"
+          <Link
+            to="/products"
             className={mainTab === "catalog" ? "active" : ""}
             onClick={() => setMobileMenuOpen(false)}
           >
             الكتالوج
-          </a>
-          <a
-            href="#checkout"
+          </Link>
+          <Link
+            to="/checkout"
             className={mainTab === "checkout" ? "active" : ""}
             onClick={() => setMobileMenuOpen(false)}
           >
             الدفع
-          </a>
-          <a
-            href="#orders"
+          </Link>
+          <Link
+            to="/orders"
             className={mainTab === "orders" ? "active" : ""}
             onClick={() => setMobileMenuOpen(false)}
           >
             طلباتي
-          </a>
-          <a
-            href="#track"
+          </Link>
+          <Link
+            to="/track"
             className={mainTab === "track" ? "active" : ""}
             onClick={() => setMobileMenuOpen(false)}
           >
             تتبع الطلب
-          </a>
+          </Link>
           <button
             type="button"
             onClick={() => {
@@ -3314,12 +3784,12 @@ const addItemToCart = (
           
           {hasAdminToken && (
             <>
-              <a href="#admin" onClick={() => setMobileMenuOpen(false)}>
+              <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
                 الإدارة
-              </a>
-              <a href="#analytics" onClick={() => setMobileMenuOpen(false)}>
+              </Link>
+              <Link to="/analytics" onClick={() => setMobileMenuOpen(false)}>
                 لوحة التحليلات
-              </a>
+              </Link>
             </>
           )}
         </nav>
@@ -3334,7 +3804,7 @@ const addItemToCart = (
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     setSearchInputOpen(false);
-                    window.location.hash = '#catalog';
+                    navigate("/products");
                   }
                 }}
                 className="search-input"
@@ -3346,7 +3816,7 @@ const addItemToCart = (
               onClick={() => {
                 if (searchInputOpen && searchQuery.trim()) {
                   setSearchInputOpen(false);
-                  window.location.hash = '#catalog';
+                  navigate("/products");
                 } else {
                   setSearchInputOpen(!searchInputOpen);
                 }
@@ -3435,25 +3905,25 @@ const addItemToCart = (
             )}
           </div>
           {customerProfile ? (
-            <a
-              href="#logout"
+            <Link
+              to="/logout"
               onClick={() => setMobileMenuOpen(false)}
               className="nav-auth-btn"
               aria-label="تسجيل الخروج"
               title="تسجيل الخروج"
             >
               <LogOut size={20} />
-            </a>
+            </Link>
           ) : (
-            <a
-              href="#login"
+            <Link
+              to="/login"
               onClick={() => setMobileMenuOpen(false)}
               className="nav-auth-btn"
               aria-label="تسجيل الدخول"
               title="تسجيل الدخول"
             >
               <LogIn size={20} />
-            </a>
+            </Link>
           )}
         </div>
       </header>
@@ -3477,7 +3947,9 @@ const addItemToCart = (
           ) : (
             <div className="favorites-grid">
               {favoriteProducts.map((fav) => {
-                const loadedProduct = products.find(p => p.id === fav.product);
+                const loadedProduct =
+                  products.find((p) => p.id === fav.product) ??
+                  favoriteProductDetails[fav.product];
                 // Fall back to the data returned by the favorites API itself
                 // instead of skipping the item when it's not on the current
                 // products page/filter (e.g. different category, page 2, etc.)
@@ -3632,9 +4104,9 @@ const addItemToCart = (
             ما تسيب المتجر.
           </p>
           <div className="hero-actions">
-            <a className="primary-link" href="#catalog">
+            <Link className="primary-link" to="/products">
               تصفح الكتالوج
-            </a>
+            </Link>
             <button
               type="button"
               className="text-link"
@@ -3862,11 +4334,7 @@ const addItemToCart = (
                       <button
                         type="button"
                         className="outline-btn"
-                        onClick={() => {
-                          const message = `مرحباً، أريد طلب هذا المنتج:\n\n${product.title}\n\nالسعر: ${money(product.final_price)}\n\nالرابط: ${window.location.href}#catalog`;
-                          const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
-                          window.open(whatsappUrl, '_blank');
-                        }}
+                        onClick={() => openProductWhatsapp(product)}
                       >
                         <img
   src="https://cdn.simpleicons.org/whatsapp/25D366"
@@ -3989,7 +4457,24 @@ const addItemToCart = (
             إغلاق التفاصيل والعودة
           </button>
         </div>
-        {!activeProduct && (
+        {detailsLoading && (
+          <div className="details-empty-state">
+            <Loader2 className="spin" />
+            <p className="eyebrow">تفاصيل المنتج</p>
+            <h2>جاري تحميل المنتج...</h2>
+          </div>
+        )}
+        {!detailsLoading && detailsError && (
+          <div className="details-empty-state">
+            <p className="eyebrow">تفاصيل المنتج</p>
+            <h2>لم نقدر نحمل المنتج</h2>
+            <p className="muted">{detailsError}</p>
+            <Link className="primary-link" to="/products">
+              تصفح الكتالوج
+            </Link>
+          </div>
+        )}
+        {!detailsLoading && !detailsError && !activeProduct && (
           <div className="details-empty-state">
             <p className="eyebrow">تفاصيل المنتج</p>
             <h2>اختر منتجًا من الكتالوج</h2>
@@ -3997,12 +4482,12 @@ const addItemToCart = (
               اضغط "التفاصيل" على أي قطعة في الكتالوج عشان تشوف صورها
               ومواصفاتها وخيارات الشحن كاملة هنا.
             </p>
-            <a className="primary-link" href="#catalog">
+            <Link className="primary-link" to="/products">
               تصفح الكتالوج
-            </a>
+            </Link>
           </div>
         )}
-        {activeProduct &&
+        {!detailsLoading && !detailsError && activeProduct &&
         (() => {
           const productImages = Array.isArray(activeProduct.images)
             ? activeProduct.images
@@ -4150,11 +4635,7 @@ const addItemToCart = (
                   <button
                     type="button"
                     className="detail-whatsapp-btn"
-                    onClick={() => {
-                      const message = `مرحباً، أريد طلب هذا المنتج:\n\n${activeProduct.title}\n\nالسعر: ${money(activeProduct.final_price)}\n\nالرابط: ${window.location.href}`;
-                      const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
-                      window.open(whatsappUrl, '_blank');
-                    }}
+                    onClick={() => openProductWhatsapp(activeProduct)}
                   >
                     <img
   src="https://cdn.simpleicons.org/whatsapp/25D366"
@@ -4423,9 +4904,9 @@ const addItemToCart = (
         يمكن الرابط اتغيّر أو مش متاح دلوقتي. هنرجّعك للصفحة الرئيسية
         تلقائيًا خلال لحظات.
       </p>
-      <a className="primary-link" href="#catalog">
+      <Link className="primary-link" to="/products">
         العودة للصفحة الرئيسية
-      </a>
+      </Link>
     </div>
   </section>
 )}
@@ -4433,7 +4914,7 @@ const addItemToCart = (
       <button
         className="chat-launcher"
         type="button"
-        onClick={() => openContextChat(activeProduct ?? undefined)}
+        onClick={() => openContextChat(mainTab === "details" ? activeProduct ?? undefined : undefined)}
         aria-label="Open customer service chat"
       >
         <MessageCircle size={24} />
@@ -4521,7 +5002,7 @@ const addItemToCart = (
                   className="whatsapp-checkout-btn"
                   onClick={() => {
                     const orderMessage = cart.map(item =>
-                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}`
+                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}\nرابط المنتج: ${productPageUrl(item.product)}`
                     ).join('\n');
                     const message = `مرحباً، أريد إنشاء طلب جديد:\n\n${orderMessage}\n\nالمجموع: ${money(subtotal)}\nالشحن: ${money(totalShipping)}\nالإجمالي: ${money(grandTotal)}`;
                     const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
@@ -4850,6 +5331,7 @@ const addItemToCart = (
         </div>
       )}
     </main>
+    </WishlistProvider>
   );
 }
 

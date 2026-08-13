@@ -178,7 +178,7 @@ export default function ProductsTab({
                     </td>
                     <td style={{ padding: "12px 8px" }}>
                       <a
-                        href={`/#products/${p.slug}`}
+                        href={`/product/${p.slug}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{
@@ -288,7 +288,7 @@ export default function ProductsTab({
                 </p>
 
                 <a
-                  href={`/#products/${p.slug}`}
+                  href={`/product/${p.slug}`}
                   target="_blank"
                   rel="noreferrer"
                   style={{
@@ -372,7 +372,7 @@ export default function ProductsTab({
                 </div>
 
                 <a
-                  href={`/#products/${p.product_slug}`}
+                  href={`/product/${p.product_slug}`}
                   target="_blank"
                   rel="noreferrer"
                   style={{

@@ -8,6 +8,14 @@ const API_BASE_URL = "https://mahmoudelbedewy-fureniture.hf.space";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const xmlEscape = (value) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
 async function fetchProducts() {
   const products = [];
   let nextUrl = `${API_BASE_URL}/api/catalog/products/`;
@@ -72,19 +80,33 @@ async function generateSitemap() {
     <priority>1.0</priority>
     <changefreq>daily</changefreq>
   </url>
+  <url>
+    <loc>${SITE_URL}/products</loc>
+    <priority>1.0</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>${SITE_URL}/about</loc>
+    <priority>0.4</priority>
+    <changefreq>monthly</changefreq>
+  </url>
 `;
 
-  // Add category URLs if you want them mapped (e.g. /#catalog?category=slug)
-  // Or just rely on the main page for categories.
-  // Actually, wait, it looks like they don't have dedicated server routes for categories yet.
-  // But we can add them with the hash or query string just in case they are indexable or handled.
-  // For standard SEO, it's better to provide clean URLs. We will just provide products for now.
+  for (const category of categories) {
+    if (category.slug) {
+      sitemapContent += `  <url>
+    <loc>${SITE_URL}/category/${xmlEscape(category.slug)}</loc>
+    <priority>0.7</priority>
+    <changefreq>weekly</changefreq>
+  </url>\n`;
+    }
+  }
 
   console.log(`Adding ${products.length} products to sitemap...`);
   for (const product of products) {
     if (product.slug) {
       sitemapContent += `  <url>
-    <loc>${SITE_URL}/products/${product.slug}</loc>
+    <loc>${SITE_URL}/product/${xmlEscape(product.slug)}</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>\n`;

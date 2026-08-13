@@ -66,6 +66,7 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('analytics_theme') as Theme) || 'dark',
   );
+  const currentDataRangeKey = dataRangeKey(dateRange);
 
   useEffect(() => {
     localStorage.setItem('analytics_theme', theme);
@@ -90,7 +91,7 @@ export default function AnalyticsDashboard({ onBack }: { onBack?: () => void }) 
       });
     }, 0);
     return () => window.clearTimeout(id);
-  }, [activeTab, widgetPrefs, dataRangeKey(dateRange)]);
+  }, [activeTab, widgetPrefs, currentDataRangeKey]);
 
   useEffect(() => {
     const query = quickSearch.trim();

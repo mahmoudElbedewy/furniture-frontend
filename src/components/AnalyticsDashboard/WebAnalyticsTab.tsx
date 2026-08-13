@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, Tooltip,
   ResponsiveContainer, XAxis, YAxis, CartesianGrid,
-  LineChart, Line, Legend, AreaChart, Area,
+  Legend, AreaChart, Area,
 } from 'recharts';
 import { Clock, MousePointerClick, Globe, ArrowUpRight, ArrowDownRight, GitCompare } from 'lucide-react';
 import { fetchWebAnalytics, type WebAnalyticsData, type TopPage } from './api';
