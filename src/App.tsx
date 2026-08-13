@@ -273,20 +273,6 @@ const productShareCodeFromPath = (path: string) => readPathSegment(path, "/p/");
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const compactProductId = (productId: string) => {
-  if (!UUID_PATTERN.test(productId)) return productId;
-
-  const binary = productId
-    .replaceAll("-", "")
-    .match(/.{2}/g)
-    ?.map((byte) => String.fromCharCode(Number.parseInt(byte, 16)))
-    .join("");
-
-  return binary
-    ? window.btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")
-    : productId;
-};
-
 const productIdFromShareCode = (shareCode: string | null) => {
   if (!shareCode) return null;
   if (UUID_PATTERN.test(shareCode)) return shareCode;
@@ -412,13 +398,10 @@ const resolveAssetUrl = (url?: string | null) => {
   return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 };
 
-const productShareUrl = (product: Pick<Product, "id">) =>
-  new URL(
-    `/p/${encodeURIComponent(compactProductId(product.id))}`,
-    window.location.origin,
-  ).toString();
+const productShareUrl = (product: Pick<Product, "slug">) =>
+  `${window.location.origin}/product/${product.slug}`;
 
-const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "id">) => {
+const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "slug">) => {
   const message = [
     "مرحباً، أريد الاستفسار عن المنتج التالي:",
     `المنتج: ${product.title}`,
@@ -1930,6 +1913,9 @@ const mainTab = useMemo<
         setActiveImageIndex(0);
         setDetailSelectedVariant(pickDefaultVariant(product));
         trackFunnelEvent("product_view", product.id);
+        if (routeProductShareCode) {
+          navigate(`/product/${product.slug}`, { replace: true });
+        }
       } catch (error) {
         if (cancelled) return;
         setActiveProduct(null);
@@ -1947,7 +1933,13 @@ const mainTab = useMemo<
     return () => {
       cancelled = true;
     };
-  }, [mainTab, routeProductId, routeProductShareCode, routeProductSlug]);
+  }, [
+    mainTab,
+    navigate,
+    routeProductId,
+    routeProductShareCode,
+    routeProductSlug,
+  ]);
 
   const chatContext = useMemo<ChatContext>(() => {
     const currentPage = `${location.pathname}${location.search}`;
