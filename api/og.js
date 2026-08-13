@@ -1,8 +1,10 @@
 const API_ORIGIN = "https://mahmoudelbedewy-fureniture.hf.space";
 const SITE_ORIGIN = "https://myhomestyle.store";
-const LOGO_IMAGE =
-  "https://res.cloudinary.com/dlsrs0ir9/image/upload/v1786657806/site_assets/home-style-og-logo.jpg";
-const DEFAULT_IMAGE = LOGO_IMAGE;
+const SITE_PREVIEW_IMAGE =
+  "https://res.cloudinary.com/dlsrs0ir9/image/upload/v1786658753/site_assets/home-style-social-preview.jpg";
+const SITE_PREVIEW_IMAGE_WIDTH = 1280;
+const SITE_PREVIEW_IMAGE_HEIGHT = 532;
+const DEFAULT_IMAGE = SITE_PREVIEW_IMAGE;
 
 const firstValue = (value) => (Array.isArray(value) ? value[0] : value);
 
@@ -71,14 +73,14 @@ const renderMetadata = ({
   const safeDescription = escapeHtml(description);
   const safeCanonical = escapeHtml(canonical);
   const safeImage = escapeHtml(image);
-  const isLogoImage = image === LOGO_IMAGE;
-  const imageDetails = isLogoImage
+  const isSitePreviewImage = image === SITE_PREVIEW_IMAGE;
+  const imageDetails = isSitePreviewImage
     ? `
   <meta property="og:image:url" content="${safeImage}">
   <meta property="og:image:secure_url" content="${safeImage}">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">`
+  <meta property="og:image:width" content="${SITE_PREVIEW_IMAGE_WIDTH}">
+  <meta property="og:image:height" content="${SITE_PREVIEW_IMAGE_HEIGHT}">`
     : `
   <meta property="og:image:url" content="${safeImage}">
   <meta property="og:image:secure_url" content="${safeImage}">`;
@@ -144,7 +146,7 @@ export default async function handler(req, res) {
       description:
         "Discover sofas, bedrooms, dining rooms, and modern home furniture from Home Style in Egypt.",
       canonical: `${SITE_ORIGIN}/`,
-      image: LOGO_IMAGE,
+      image: SITE_PREVIEW_IMAGE,
     };
 
     if ((type === "product" && slug) || (type === "product-id" && productId)) {
