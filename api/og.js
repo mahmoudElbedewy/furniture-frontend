@@ -1,6 +1,7 @@
 const API_ORIGIN = "https://mahmoudelbedewy-fureniture.hf.space";
 const SITE_ORIGIN = "https://myhomestyle.store";
-const LOGO_IMAGE = `${SITE_ORIGIN}/og-logo.png`;
+const LOGO_IMAGE =
+  "https://res.cloudinary.com/dlsrs0ir9/image/upload/v1786657806/site_assets/home-style-og-logo.jpg";
 const DEFAULT_IMAGE = LOGO_IMAGE;
 
 const firstValue = (value) => (Array.isArray(value) ? value[0] : value);
@@ -70,6 +71,17 @@ const renderMetadata = ({
   const safeDescription = escapeHtml(description);
   const safeCanonical = escapeHtml(canonical);
   const safeImage = escapeHtml(image);
+  const isLogoImage = image === LOGO_IMAGE;
+  const imageDetails = isLogoImage
+    ? `
+  <meta property="og:image:url" content="${safeImage}">
+  <meta property="og:image:secure_url" content="${safeImage}">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">`
+    : `
+  <meta property="og:image:url" content="${safeImage}">
+  <meta property="og:image:secure_url" content="${safeImage}">`;
   const jsonLd = productSchema
     ? `<script type="application/ld+json">${JSON.stringify(productSchema)
         .replace(/</g, "\\u003c")
@@ -89,7 +101,7 @@ const renderMetadata = ({
   <meta property="og:description" content="${safeDescription}">
   <meta property="og:image" content="${safeImage}">
   <meta property="og:image:alt" content="${safeTitle}">
-  <meta property="og:image:secure_url" content="${safeImage}">
+  ${imageDetails}
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${safeTitle}">
   <meta name="twitter:description" content="${safeDescription}">

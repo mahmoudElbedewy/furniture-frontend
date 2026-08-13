@@ -416,7 +416,8 @@ const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "s
 };
 
 const SITE_ORIGIN = "https://myhomestyle.store";
-const SITE_LOGO_SHARE_IMAGE = `${SITE_ORIGIN}/og-logo.png`;
+const SITE_LOGO_SHARE_IMAGE =
+  "https://res.cloudinary.com/dlsrs0ir9/image/upload/v1786657806/site_assets/home-style-og-logo.jpg";
 const DEFAULT_META_DESCRIPTION =
   "Home Style: contemporary furniture in Egypt. Discover sofas, bedrooms, dining rooms, and home furniture.";
 
