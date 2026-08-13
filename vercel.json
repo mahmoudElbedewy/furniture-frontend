@@ -1,4 +1,7 @@
 {
+  "routes": [
+    { "src": "^/$", "dest": "/api/og.js?type=home" }
+  ],
   "rewrites": [
     { "source": "/p/:id", "destination": "/api/og.js?type=product-id&id=:id" },
     { "source": "/product/:slug", "destination": "/api/og.js?type=product&slug=:slug" },
