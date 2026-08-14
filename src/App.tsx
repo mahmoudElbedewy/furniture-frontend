@@ -3214,7 +3214,7 @@ const addItemToCart = (
                     <strong>
                       {money(dashboardStats?.received_commissions)}
                     </strong>
-                    عمولات مستلمة
+                    إجمالي العمولات المستلمة
                   </span>
                   <span><strong>{money(dashboardStats?.our_payments)}</strong>{"\u0645\u062f\u0641\u0648\u0639\u0627\u062a\u0646\u0627"}</span>
                   <span><strong>{money(dashboardStats?.net_profit)}</strong>{"\u0635\u0627\u0641\u064a \u0627\u0644\u0631\u0628\u062d"}</span>
