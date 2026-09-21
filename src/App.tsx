@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import {
   BarChart,
   CheckCircle2,
+  ArrowRight,
   Heart,
   Home,
   ImageUp,
@@ -4509,16 +4510,24 @@ const addItemToCart = (
 
       {mainTab === "details" && (
       <div className="details-page">
-        <div className="details-header" style={{ padding: "16px 24px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--panel)" }}>
+        <div className="details-header">
           <button 
             type="button" 
-            className="text-link-btn" 
+            className="details-back-btn"
             onClick={closeProductDetails}
-            style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "16px", color: "var(--cream)", background: "transparent", border: "none", cursor: "pointer" }}
           >
-            <X size={20} />
+            <ArrowRight size={18} />
             إغلاق التفاصيل والعودة
           </button>
+          {activeProduct && (
+            <div className="detail-breadcrumbs" aria-label="مسار التصفح">
+              <span>الرئيسية</span>
+              <span aria-hidden="true">/</span>
+              <span>المنتجات</span>
+              <span aria-hidden="true">/</span>
+              <strong>{activeProduct.category_name}</strong>
+            </div>
+          )}
         </div>
         {detailsLoading && (
           <div className="details-empty-state">
@@ -4567,17 +4576,19 @@ const addItemToCart = (
             <>
             <section id="details" className="detail-section">
               <div className="detail-gallery">
-                {mainImageUrl ? (
-                  <img
-                    src={mainImageUrl}
-                    alt={activeProduct.title}
-                    className="main-detail-image"
-                  />
-                ) : (
-                  <div className="detail-placeholder">
-                    لا توجد صورة للمنتج
-                  </div>
-                )}
+                <div className="detail-gallery-main">
+                  {mainImageUrl ? (
+                    <img
+                      src={mainImageUrl}
+                      alt={activeProduct.title}
+                      className="main-detail-image"
+                    />
+                  ) : (
+                    <div className="detail-placeholder">
+                      لا توجد صورة للمنتج
+                    </div>
+                  )}
+                </div>
 
                 {productImages.length > 1 && (
                   <div className="detail-thumbnails">
@@ -4603,13 +4614,15 @@ const addItemToCart = (
                 )}
               </div>
               <div className="detail-copy">
-                <p className="eyebrow">القطعة المختارة</p>
-                <h2>{activeProduct.title}</h2>
-                <p className="muted">{activeProduct.category_name}</p>
-                <p>
+                <div className="detail-copy-heading">
+                  <p className="eyebrow">القطعة المختارة</p>
+                  <h1>{activeProduct.title}</h1>
+                  <p className="detail-category">{activeProduct.category_name}</p>
+                  <p className="detail-description">
                   {activeProduct.description ??
                     "لا يوجد وصف للمنتج"}
-                </p>
+                  </p>
+                </div>
                 <dl className="spec-list">
                   <div>
                     <dt>الخامة</dt>
@@ -4666,49 +4679,55 @@ const addItemToCart = (
                     </div>
                   </div>
                 )}
-                <p className="detail-price">
-  {money(detailSelectedVariant ? detailSelectedVariant.price : activeProduct.final_price)}
-</p>
-                <div className="detail-actions">
-                  <button
-                    type="button"
-                    className="detail-favorite-btn"
-                    onClick={() => toggleFavorite(activeProduct.id)}
-                  >
-                    <Heart
-                      size={20}
-                      fill={favorites.has(activeProduct.id) ? "#e74c3c" : "none"}
-                      color={favorites.has(activeProduct.id) ? "#e74c3c" : "#333333"}
-                    />
-                    {favorites.has(activeProduct.id) ? "إزالة من المفضلة" : "إضافة للمفضلة"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openContextChat(activeProduct)}
-                  >
-                    تواصل مع خدمة العملاء
-                  </button>
-                  <button
-                    type="button"
-                    disabled={Boolean(activeProduct.variants?.length) && !detailSelectedVariant}
-                    onClick={() => proceedAddToCart(activeProduct, detailSelectedVariant)}
-                  >
-                    أضف للسلة
-                  </button>
-                  <button
-                    type="button"
-                    className="detail-whatsapp-btn"
-                    onClick={() => openProductWhatsapp(activeProduct)}
-                  >
-                    <img
-  src="https://cdn.simpleicons.org/whatsapp/25D366"
-  alt="WhatsApp"
-  width="16"
-  height="16"
-  style={{ display: "inline-block", verticalAlign: "middle" }}
-/>
-                    طلب عبر واتساب
-                  </button>
+                <div className="detail-purchase-card">
+                  <div className="detail-price-row">
+                    <span>السعر</span>
+                    <strong className="detail-price">
+                      {money(detailSelectedVariant ? detailSelectedVariant.price : activeProduct.final_price)}
+                    </strong>
+                  </div>
+                  <div className="detail-actions">
+                    <button
+                      type="button"
+                      className="detail-favorite-btn"
+                      onClick={() => toggleFavorite(activeProduct.id)}
+                    >
+                      <Heart
+                        size={20}
+                        fill={favorites.has(activeProduct.id) ? "#e74c3c" : "none"}
+                        color={favorites.has(activeProduct.id) ? "#e74c3c" : "#333333"}
+                      />
+                      {favorites.has(activeProduct.id) ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+                    </button>
+                    <button
+                      type="button"
+                      className="detail-chat-btn"
+                      onClick={() => openContextChat(activeProduct)}
+                    >
+                      تواصل مع خدمة العملاء
+                    </button>
+                    <button
+                      type="button"
+                      className="detail-cart-btn"
+                      disabled={Boolean(activeProduct.variants?.length) && !detailSelectedVariant}
+                      onClick={() => proceedAddToCart(activeProduct, detailSelectedVariant)}
+                    >
+                      أضف للسلة
+                    </button>
+                    <button
+                      type="button"
+                      className="detail-whatsapp-btn"
+                      onClick={() => openProductWhatsapp(activeProduct)}
+                    >
+                      <img
+                        src="https://cdn.simpleicons.org/whatsapp/25D366"
+                        alt="WhatsApp"
+                        width="16"
+                        height="16"
+                      />
+                      طلب عبر واتساب
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
