@@ -1268,15 +1268,8 @@ function App() {
   const [detailSelectedVariant, setDetailSelectedVariant] = useState<ProductVariant | null>(null);
   const [detailInfoOpen, setDetailInfoOpen] = useState(false);
   const [shippingInfoOpen, setShippingInfoOpen] = useState(false);
-  const detailThumbnailRef = useRef<HTMLDivElement | null>(null);
+  const [detailThumbnailStart, setDetailThumbnailStart] = useState(0);
   const relatedProductsRef = useRef<HTMLDivElement | null>(null);
-
-  const scrollDetailThumbnails = useCallback((direction: "previous" | "next") => {
-    detailThumbnailRef.current?.scrollBy({
-      top: direction === "next" ? 260 : -260,
-      behavior: "smooth",
-    });
-  }, []);
 
   const scrollRelatedProducts = useCallback((direction: "previous" | "next") => {
     const container = relatedProductsRef.current;
@@ -1937,6 +1930,7 @@ const mainTab = useMemo<
         if (cancelled) return;
         setActiveProduct(product);
         setActiveImageIndex(0);
+        setDetailThumbnailStart(0);
         setDetailSelectedVariant(pickDefaultVariant(product));
         setDetailInfoOpen(false);
         setShippingInfoOpen(false);
@@ -2135,6 +2129,7 @@ const openProductDetails = async (product: Product) => {
   setSavedScrollPos(window.scrollY);
   setActiveProduct(product);
   setActiveImageIndex(0);
+  setDetailThumbnailStart(0);
   setDetailSelectedVariant(pickDefaultVariant(product)); 
   setDetailInfoOpen(false);
   setShippingInfoOpen(false);
@@ -4618,6 +4613,19 @@ const addItemToCart = (
                     getImageUrl(productImages[0]),
                 )
               : resolveAssetUrl(getImageUrl(activeProduct.images));
+          const imageEntries = productImages
+            .map((img: unknown, idx: number) => ({
+              idx,
+              url: resolveAssetUrl(getImageUrl(img)),
+            }))
+            .filter((entry): entry is { idx: number; url: string } => Boolean(entry.url));
+          const thumbnailPageSize = 5;
+          const maxThumbnailStart = Math.max(0, imageEntries.length - thumbnailPageSize);
+          const safeThumbnailStart = Math.min(detailThumbnailStart, maxThumbnailStart);
+          const visibleImageEntries = imageEntries.slice(
+            safeThumbnailStart,
+            safeThumbnailStart + thumbnailPageSize,
+          );
 
           return (
             <>
@@ -4637,43 +4645,49 @@ const addItemToCart = (
                   )}
                 </div>
 
-                {productImages.length > 1 && (
+                {imageEntries.length > 1 && (
                   <div className="detail-thumbnail-rail">
-                    {productImages.length > 4 && (
+                    {imageEntries.length > thumbnailPageSize && (
                       <button
                         type="button"
                         className="detail-thumbnail-nav"
-                        onClick={() => scrollDetailThumbnails("previous")}
+                        disabled={safeThumbnailStart === 0}
+                        onClick={() =>
+                          setDetailThumbnailStart((current) =>
+                            Math.max(0, Math.min(current - thumbnailPageSize, maxThumbnailStart)),
+                          )
+                        }
                         aria-label="الصور السابقة"
                       >
                         <ChevronUp size={16} />
                       </button>
                     )}
-                    <div ref={detailThumbnailRef} className="detail-thumbnails">
-                      {productImages.map((img: unknown, idx: number) => {
-                        const thumbUrl = resolveAssetUrl(getImageUrl(img));
-                        if (!thumbUrl) return null;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            className={`thumbnail-btn ${idx === activeImageIndex ? "active" : ""}`}
-                            onClick={() => setActiveImageIndex(idx)}
-                            aria-label={`View image ${idx + 1}`}
-                          >
-                            <img
-                              src={thumbUrl}
-                              alt={`${activeProduct.title} thumbnail ${idx + 1}`}
-                            />
-                          </button>
-                        );
-                      })}
+                    <div className="detail-thumbnails">
+                      {visibleImageEntries.map(({ idx, url }) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          className={`thumbnail-btn ${idx === activeImageIndex ? "active" : ""}`}
+                          onClick={() => setActiveImageIndex(idx)}
+                          aria-label={`View image ${idx + 1}`}
+                        >
+                          <img
+                            src={url}
+                            alt={`${activeProduct.title} thumbnail ${idx + 1}`}
+                          />
+                        </button>
+                      ))}
                     </div>
-                    {productImages.length > 4 && (
+                    {imageEntries.length > thumbnailPageSize && (
                       <button
                         type="button"
                         className="detail-thumbnail-nav"
-                        onClick={() => scrollDetailThumbnails("next")}
+                        disabled={safeThumbnailStart >= maxThumbnailStart}
+                        onClick={() =>
+                          setDetailThumbnailStart((current) =>
+                            Math.min(maxThumbnailStart, current + thumbnailPageSize),
+                          )
+                        }
                         aria-label="الصور التالية"
                       >
                         <ChevronDown size={16} />

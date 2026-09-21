@@ -5395,10 +5395,13 @@ button {
 }
 
 .details-page .detail-thumbnails {
-  flex: 1 1 auto;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
   min-height: 0;
   max-height: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .details-page .detail-thumbnail-nav {
@@ -5420,6 +5423,16 @@ button {
   border-color: var(--gold);
 }
 
+.details-page .detail-thumbnail-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.details-page .detail-thumbnail-nav:disabled:hover {
+  color: var(--cream);
+  border-color: var(--line);
+}
+
 .details-page .size-option-btn.active {
   color: #ffffff;
   background: var(--gold);
@@ -5428,22 +5441,31 @@ button {
 }
 
 .related-heading-row {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   max-width: 1280px;
-  min-height: 84px;
+  min-height: 62px;
   margin: 0 auto 24px;
 }
 
 .related-heading-row .related-heading {
   margin: 0;
+  text-align: right;
+}
+
+.related-heading-row .related-heading .eyebrow {
+  justify-content: flex-start;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.related-heading-row .related-heading h2 {
+  font-size: 24px;
 }
 
 .related-carousel-controls {
-  position: absolute;
-  inset-inline-end: 0;
+  position: static;
   display: flex;
   gap: 8px;
   direction: ltr;
@@ -5507,16 +5529,26 @@ button {
 
 @media (max-width: 760px) {
   .details-page .detail-thumbnail-rail {
-    height: 100%;
+    gap: 4px;
   }
 
   .details-page .detail-thumbnails {
-    max-height: 230px;
+    gap: 4px;
+  }
+
+  .details-page .thumbnail-btn {
+    flex-basis: 42px;
+    width: 64px;
+    height: 42px;
+  }
+
+  .details-page .detail-thumbnail-nav {
+    flex-basis: 22px;
   }
 
   .related-heading-row {
-    justify-content: space-between;
-    min-height: 62px;
+    gap: 12px;
+    min-height: 58px;
   }
 
   .related-heading-row .related-heading {
@@ -5529,15 +5561,11 @@ button {
   }
 
   .related-heading-row .related-heading h2 {
-    font-size: 26px;
-  }
-
-  .related-carousel-controls {
-    position: static;
+    font-size: 20px;
   }
 
   .details-page .related-card {
-    flex-basis: calc((100% - 16px) / 2);
+    flex-basis: calc(100% - 28px);
     min-width: 0;
   }
 }
