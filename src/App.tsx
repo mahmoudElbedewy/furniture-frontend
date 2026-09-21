@@ -4,6 +4,10 @@ import {
   BarChart,
   CheckCircle2,
   ArrowRight,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Heart,
   Home,
   ImageUp,
@@ -1262,6 +1266,26 @@ function App() {
   const [sizeModalOpen, setSizeModalOpen] = useState(false);
   const [pendingVariant, setPendingVariant] = useState<ProductVariant | null>(null);
   const [detailSelectedVariant, setDetailSelectedVariant] = useState<ProductVariant | null>(null);
+  const [detailInfoOpen, setDetailInfoOpen] = useState(false);
+  const [shippingInfoOpen, setShippingInfoOpen] = useState(false);
+  const detailThumbnailRef = useRef<HTMLDivElement | null>(null);
+  const relatedProductsRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollDetailThumbnails = useCallback((direction: "previous" | "next") => {
+    detailThumbnailRef.current?.scrollBy({
+      top: direction === "next" ? 260 : -260,
+      behavior: "smooth",
+    });
+  }, []);
+
+  const scrollRelatedProducts = useCallback((direction: "previous" | "next") => {
+    const container = relatedProductsRef.current;
+    if (!container) return;
+    container.scrollBy({
+      left: direction === "next" ? container.clientWidth * 0.82 : -container.clientWidth * 0.82,
+      behavior: "smooth",
+    });
+  }, []);
 
 
   const [chatProductCards, setChatProductCards] = useState<
@@ -1914,6 +1938,8 @@ const mainTab = useMemo<
         setActiveProduct(product);
         setActiveImageIndex(0);
         setDetailSelectedVariant(pickDefaultVariant(product));
+        setDetailInfoOpen(false);
+        setShippingInfoOpen(false);
         trackFunnelEvent("product_view", product.id);
         if (routeProductShareCode) {
           navigate(`/product/${product.slug}`, { replace: true });
@@ -2110,6 +2136,8 @@ const openProductDetails = async (product: Product) => {
   setActiveProduct(product);
   setActiveImageIndex(0);
   setDetailSelectedVariant(pickDefaultVariant(product)); 
+  setDetailInfoOpen(false);
+  setShippingInfoOpen(false);
   setDetailsError("");
   navigate(`/product/${encodeURIComponent(product.slug)}`);
   window.setTimeout(() => {
@@ -4521,11 +4549,30 @@ const addItemToCart = (
           </button>
           {activeProduct && (
             <div className="detail-breadcrumbs" aria-label="مسار التصفح">
-              <span>الرئيسية</span>
+              <Link className="detail-breadcrumb-link" to="/">
+                الرئيسية
+              </Link>
               <span aria-hidden="true">/</span>
-              <span>المنتجات</span>
+              <Link className="detail-breadcrumb-link" to="/products">
+                المنتجات
+              </Link>
               <span aria-hidden="true">/</span>
-              <strong>{activeProduct.category_name}</strong>
+              <button
+                type="button"
+                className="detail-breadcrumb-link detail-breadcrumb-category"
+                onClick={() => {
+                  const categorySlug = categories.find(
+                    (category) => category.name === activeProduct.category_name,
+                  )?.slug;
+                  navigate(
+                    categorySlug
+                      ? `/category/${encodeURIComponent(categorySlug)}`
+                      : "/products",
+                  );
+                }}
+              >
+                {activeProduct.category_name}
+              </button>
             </div>
           )}
         </div>
@@ -4591,25 +4638,47 @@ const addItemToCart = (
                 </div>
 
                 {productImages.length > 1 && (
-                  <div className="detail-thumbnails">
-                    {productImages.map((img: unknown, idx: number) => {
-                      const thumbUrl = resolveAssetUrl(getImageUrl(img));
-                      if (!thumbUrl) return null;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          className={`thumbnail-btn ${idx === activeImageIndex ? "active" : ""}`}
-                          onClick={() => setActiveImageIndex(idx)}
-                          aria-label={`View image ${idx + 1}`}
-                        >
-                          <img
-                            src={thumbUrl}
-                            alt={`${activeProduct.title} thumbnail ${idx + 1}`}
-                          />
-                        </button>
-                      );
-                    })}
+                  <div className="detail-thumbnail-rail">
+                    {productImages.length > 4 && (
+                      <button
+                        type="button"
+                        className="detail-thumbnail-nav"
+                        onClick={() => scrollDetailThumbnails("previous")}
+                        aria-label="الصور السابقة"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                    )}
+                    <div ref={detailThumbnailRef} className="detail-thumbnails">
+                      {productImages.map((img: unknown, idx: number) => {
+                        const thumbUrl = resolveAssetUrl(getImageUrl(img));
+                        if (!thumbUrl) return null;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            className={`thumbnail-btn ${idx === activeImageIndex ? "active" : ""}`}
+                            onClick={() => setActiveImageIndex(idx)}
+                            aria-label={`View image ${idx + 1}`}
+                          >
+                            <img
+                              src={thumbUrl}
+                              alt={`${activeProduct.title} thumbnail ${idx + 1}`}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {productImages.length > 4 && (
+                      <button
+                        type="button"
+                        className="detail-thumbnail-nav"
+                        onClick={() => scrollDetailThumbnails("next")}
+                        aria-label="الصور التالية"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -4623,41 +4692,66 @@ const addItemToCart = (
                     "لا يوجد وصف للمنتج"}
                   </p>
                 </div>
-                <dl className="spec-list">
-                  <div>
-                    <dt>الخامة</dt>
-                    <dd>{activeProduct.material ?? "-"}</dd>
-                  </div>
-                  <div>
-                    <dt>اللون</dt>
-                    <dd>{activeProduct.color ?? "-"}</dd>
-                  </div>
-                  <div>
-                    <dt>الأبعاد</dt>
-                    <dd>{activeProduct.dimensions ?? "-"}</dd>
-                  </div>
-                  <div>
-                    <dt>العربون</dt>
-                    <dd>
-                      {activeProduct.requires_deposit
-                        ? money(activeProduct.deposit_amount)
-                        : "غير مطلوب"}
-                    </dd>
-                  </div>
-                </dl>
-                
+                <div className={`detail-accordion ${detailInfoOpen ? "open" : ""}`}>
+                  <button
+                    type="button"
+                    className="detail-accordion-trigger"
+                    onClick={() => setDetailInfoOpen((current) => !current)}
+                    aria-expanded={detailInfoOpen}
+                  >
+                    <span>تفاصيل المنتج</span>
+                    <ChevronDown size={17} />
+                  </button>
+                  {detailInfoOpen && (
+                    <dl className="spec-list">
+                      <div>
+                        <dt>الخامة</dt>
+                        <dd>{activeProduct.material ?? "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>اللون</dt>
+                        <dd>{activeProduct.color ?? "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>الأبعاد</dt>
+                        <dd>{activeProduct.dimensions ?? "-"}</dd>
+                      </div>
+                      <div>
+                        <dt>العربون</dt>
+                        <dd>
+                          {activeProduct.requires_deposit
+                            ? money(activeProduct.deposit_amount)
+                            : "غير مطلوب"}
+                        </dd>
+                      </div>
+                    </dl>
+                  )}
+                </div>
+
                 {activeProduct.shipping_summary && (
-                  <div className="shipping-info">
-                    <h4>خيارات الشحن</h4>
-                    <p className="shipping-message">{activeProduct.shipping_summary.message}</p>
-                    {activeProduct.shipping_rates && activeProduct.shipping_rates.length > 0 && (
-                      <div className="shipping-rates-list">
-                        {activeProduct.shipping_rates.map((rate, idx) => (
-                          <div key={idx} className="shipping-rate-item">
-                            <span>{rate.governorate_name}{rate.area_name ? ` - ${rate.area_name}` : ''}</span>
-                            <span className="shipping-price">{rate.price === '0' ? 'مجاني' : money(rate.price)}</span>
+                  <div className={`detail-accordion shipping-accordion ${shippingInfoOpen ? "open" : ""}`}>
+                    <button
+                      type="button"
+                      className="detail-accordion-trigger"
+                      onClick={() => setShippingInfoOpen((current) => !current)}
+                      aria-expanded={shippingInfoOpen}
+                    >
+                      <span>تفاصيل الشحن</span>
+                      <ChevronDown size={17} />
+                    </button>
+                    {shippingInfoOpen && (
+                      <div className="shipping-info">
+                        <p className="shipping-message">{activeProduct.shipping_summary.message}</p>
+                        {activeProduct.shipping_rates && activeProduct.shipping_rates.length > 0 && (
+                          <div className="shipping-rates-list">
+                            {activeProduct.shipping_rates.map((rate, idx) => (
+                              <div key={idx} className="shipping-rate-item">
+                                <span>{rate.governorate_name}{rate.area_name ? ` - ${rate.area_name}` : ''}</span>
+                                <span className="shipping-price">{rate.price === '0' ? 'مجاني' : money(rate.price)}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
@@ -4666,14 +4760,15 @@ const addItemToCart = (
                   <div className="size-selector">
                     <h4>المقاسات والأسعار المتاحة</h4>
                     <div className="size-options">
-                      {activeProduct.variants.map((variant) => (
+                      {activeProduct.variants.map((variant, variantIndex) => (
                         <button
                           key={variant.id}
                           type="button"
                           className={`size-option-btn ${detailSelectedVariant?.id === variant.id ? "active" : ""}`}
                           onClick={() => setDetailSelectedVariant(variant)}
+                          aria-pressed={detailSelectedVariant?.id === variant.id}
                         >
-                          {variant.size_name} — {money(variant.price)}
+                          {variant.size_name?.trim() || `المقاس ${variantIndex + 1}`} — {money(variant.price)}
                         </button>
                       ))}
                     </div>
@@ -4734,11 +4829,29 @@ const addItemToCart = (
 
             {relatedProducts.length > 0 && (
               <section className="related-section">
-                <div className="related-heading">
-                  <p className="eyebrow">قد يعجبك أيضاً</p>
-                  <h2>منتجات مشابهة</h2>
+                <div className="related-heading-row">
+                  <div className="related-heading">
+                    <p className="eyebrow">قد يعجبك أيضاً</p>
+                    <h2>منتجات مشابهة</h2>
+                  </div>
+                  <div className="related-carousel-controls" aria-label="التنقل بين المنتجات المشابهة">
+                    <button
+                      type="button"
+                      onClick={() => scrollRelatedProducts("previous")}
+                      aria-label="المنتجات السابقة"
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollRelatedProducts("next")}
+                      aria-label="المنتجات التالية"
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                  </div>
                 </div>
-                <div className="related-grid">
+                <div ref={relatedProductsRef} className="related-grid">
                   {relatedProducts.map((related) => {
                     const relatedImage = resolveAssetUrl(
                       getImageUrl(related.images),

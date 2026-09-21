@@ -5072,6 +5072,27 @@ button {
   font-weight: 500;
 }
 
+.detail-breadcrumb-link {
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.detail-breadcrumb-link:hover,
+.detail-breadcrumb-link:focus-visible {
+  color: var(--gold);
+}
+
+.detail-breadcrumb-category {
+  color: var(--cream);
+  font-weight: 500;
+}
+
 .details-page .detail-section {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: clamp(28px, 5vw, 72px);
@@ -5359,6 +5380,309 @@ button {
   }
 
   .details-page .detail-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Keep long product galleries inside the details frame. */
+.details-page .detail-thumbnail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.details-page .detail-thumbnails {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.details-page .detail-thumbnail-nav {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 100%;
+  padding: 0;
+  color: var(--cream);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+
+.details-page .detail-thumbnail-nav:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.details-page .size-option-btn.active {
+  color: #ffffff;
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.22);
+}
+
+.related-heading-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 1280px;
+  min-height: 84px;
+  margin: 0 auto 24px;
+}
+
+.related-heading-row .related-heading {
+  margin: 0;
+}
+
+.related-carousel-controls {
+  position: absolute;
+  inset-inline-end: 0;
+  display: flex;
+  gap: 8px;
+  direction: ltr;
+}
+
+.related-carousel-controls button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--cream);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.related-carousel-controls button:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: var(--panel);
+}
+
+.details-page .related-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 16px;
+  max-width: 1280px;
+  padding: 4px 2px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  direction: ltr;
+}
+
+.details-page .related-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.details-page .related-card {
+  flex: 0 0 calc((100% - 64px) / 5);
+  min-width: 190px;
+  scroll-snap-align: start;
+  direction: rtl;
+}
+
+.details-page .related-card-image {
+  aspect-ratio: 1 / 0.92;
+}
+
+@media (max-width: 1100px) {
+  .details-page .related-card {
+    flex-basis: calc((100% - 48px) / 4);
+  }
+}
+
+@media (max-width: 760px) {
+  .details-page .detail-thumbnail-rail {
+    height: 100%;
+  }
+
+  .details-page .detail-thumbnails {
+    max-height: 230px;
+  }
+
+  .related-heading-row {
+    justify-content: space-between;
+    min-height: 62px;
+  }
+
+  .related-heading-row .related-heading {
+    text-align: right;
+  }
+
+  .related-heading-row .related-heading .eyebrow {
+    justify-content: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .related-heading-row .related-heading h2 {
+    font-size: 26px;
+  }
+
+  .related-carousel-controls {
+    position: static;
+  }
+
+  .details-page .related-card {
+    flex-basis: calc((100% - 16px) / 2);
+    min-width: 0;
+  }
+}
+
+/* Compact detail accordions keep the product page short until the customer
+   asks for specifications or shipping details. */
+.details-page .detail-copy-heading .eyebrow {
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+
+.details-page .detail-copy h1 {
+  font-size: clamp(26px, 3vw, 40px);
+}
+
+.details-page .detail-category {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.details-page .detail-description {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.detail-accordion {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-input);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.detail-accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 16px;
+  color: var(--cream);
+  background: transparent;
+  border: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  cursor: pointer;
+}
+
+.detail-accordion-trigger svg {
+  color: var(--gold);
+  transition: transform 180ms ease;
+}
+
+.detail-accordion.open .detail-accordion-trigger svg {
+  transform: rotate(180deg);
+}
+
+.details-page .detail-accordion .spec-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.details-page .detail-accordion .spec-list div {
+  min-height: 58px;
+  padding: 10px 12px;
+}
+
+.details-page .detail-accordion .spec-list dt {
+  font-size: 10px;
+}
+
+.details-page .detail-accordion .spec-list dd {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.details-page .shipping-accordion {
+  margin-top: 10px;
+}
+
+.details-page .shipping-accordion .shipping-info {
+  margin: 0;
+  padding: 0 12px 12px;
+  border: 0;
+  border-radius: 0;
+}
+
+.details-page .shipping-message,
+.details-page .shipping-rate-item {
+  font-size: 12px;
+}
+
+.details-page .shipping-rate-item {
+  padding: 7px 10px;
+}
+
+.details-page .size-selector {
+  margin-top: 12px;
+  padding: 14px;
+}
+
+.details-page .size-selector h4 {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.details-page .size-option-btn {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.details-page .detail-purchase-card {
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.details-page .detail-price-row {
+  padding-bottom: 12px;
+}
+
+.details-page .detail-price-row > span {
+  font-size: 12px;
+}
+
+.details-page .detail-price {
+  font-size: 28px;
+}
+
+.details-page .detail-actions button {
+  min-height: 44px;
+  font-size: 12px;
+}
+
+@media (max-width: 620px) {
+  .details-page .detail-copy h1 {
+    font-size: 28px;
+  }
+
+  .details-page .detail-accordion .spec-list {
     grid-template-columns: 1fr;
   }
 }
