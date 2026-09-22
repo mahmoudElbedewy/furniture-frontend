@@ -29,6 +29,7 @@ import {
   ShoppingBag,
   User,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -68,12 +69,14 @@ type OrderItemPayload = {
   shipping_price?: number;
   shipping_location?: string;
   variant_id?: string | null;
+  selected_color?: string | null;
 };
 
 type OrderPayload = {
   customer_name: string;
   customer_phone: string;
   customer_governorate: string;
+  customer_area?: string;
   customer_address: string;
   notes?: string;
   shipping_price?: number;
@@ -248,6 +251,21 @@ type StorePayment = {
   paid_at: string;
 };
 
+type CatalogFilterOptions = {
+  colors: string[];
+  materials: string[];
+};
+
+type CatalogSearchSuggestions = {
+  products: Product[];
+  categories: Category[];
+};
+
+type ProductRecommendations = {
+  similar: Product[];
+  complementary: Product[];
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 const CATALOG_PAGE_SIZE = 16;
 const WHATSAPP_BUSINESS_NUMBER = "201503466584";
@@ -259,6 +277,24 @@ const WS_BASE_URL =
 
 const heroImage =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1800&q=85";
+
+const VISITOR_ID_STORAGE_KEY = "furniture_visitor_id";
+
+const getVisitorId = () => {
+  const existing = localStorage.getItem(VISITOR_ID_STORAGE_KEY);
+  if (existing) return existing;
+
+  const nextId =
+    typeof crypto?.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(VISITOR_ID_STORAGE_KEY, nextId);
+  return nextId;
+};
+
+const getVisitorHeaders = () => ({
+  "X-Furniture-Visitor": getVisitorId(),
+});
 
 const normalizePath = (path: string) =>
   path.length > 1 ? path.replace(/\/+$/, "") : path;
@@ -364,16 +400,38 @@ const getAuthHeaders = (): Record<string, string> => {
 const itemUnitPrice = (item: CartItem) =>
   item.selectedVariant ? Number(item.selectedVariant.price) : Number(item.product.final_price);
 
-const cartItemKey = (product: Product, variant?: ProductVariant | null) =>
-  variant ? `${product.id}::${variant.id}` : product.id;
+const cartItemKey = (
+  product: Product,
+  variant?: ProductVariant | null,
+  selectedColor?: string | null,
+) => `${product.id}::${variant?.id ?? "default"}::${selectedColor?.trim() || "default"}`;
 
 const pickDefaultVariant = (product?: Product | null): ProductVariant | null =>
   product?.variants && product.variants.length > 0 ? product.variants[0] : null;
+
+const productColorOptions = (product?: Product | null) =>
+  Array.isArray(product?.color_options)
+    ? product.color_options
+        .map((color) => String(color).trim())
+        .filter(Boolean)
+    : [];
+
+const hasProductPurchaseDetails = (product: Product) =>
+  Object.prototype.hasOwnProperty.call(product, "variants") &&
+  Object.prototype.hasOwnProperty.call(product, "shipping_rates") &&
+  Object.prototype.hasOwnProperty.call(product, "color_options");
 const getImageUrl = (images: unknown) => {
   if (typeof images === "string" && images.startsWith("http")) return images;
 
   if (Array.isArray(images)) {
-    const first = images[0];
+    const first =
+      images.find(
+        (image) =>
+          typeof image === "object" &&
+          image !== null &&
+          "is_primary" in image &&
+          Boolean((image as { is_primary?: boolean }).is_primary),
+      ) ?? images[0];
     if (typeof first === "string") return first;
     if (first && typeof first === "object") {
       const candidate = first as {
@@ -403,16 +461,38 @@ const resolveAssetUrl = (url?: string | null) => {
   return `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
 };
 
-const productShareUrl = (product: Pick<Product, "slug">) =>
-  `${window.location.origin}/product/${product.slug}`;
+const optimizeProductImageUrl = (url: string, width: number) => {
+  if (
+    !url.includes("res.cloudinary.com") ||
+    !url.includes("/upload/") ||
+    url.includes("/upload/f_auto,")
+  ) {
+    return url;
+  }
+  return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+};
 
-const openProductWhatsapp = (product: Pick<Product, "title" | "final_price" | "slug">) => {
+const productShareUrl = (product: Pick<Product, "slug">) =>
+  `${window.location.origin}/product/${encodeURIComponent(product.slug)}`;
+
+const openProductWhatsapp = (
+  product: Pick<Product, "title" | "final_price" | "slug">,
+  options?: {
+    variant?: ProductVariant | null;
+    color?: string | null;
+  },
+) => {
+  const selectedPrice = options?.variant?.price ?? product.final_price;
   const message = [
     "مرحباً، أريد الاستفسار عن المنتج التالي:",
     `المنتج: ${product.title}`,
-    `السعر: ${money(product.final_price)}`,
+    options?.variant ? `المقاس: ${options.variant.size_name}` : "",
+    options?.color ? `اللون: ${options.color}` : "",
+    `السعر: ${money(selectedPrice)}`,
     `رابط المنتج المباشر: ${productShareUrl(product)}`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   window.open(
     `https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(message)}`,
     "_blank",
@@ -836,11 +916,24 @@ const api = {
       `/api/catalog/products/${query ? `?${query}` : ""}`,
     );
   },
+  async getFilterOptions() {
+    return request<CatalogFilterOptions>("/api/catalog/filter-options/");
+  },
+  async getSearchSuggestions(query: string) {
+    return request<CatalogSearchSuggestions>(
+      `/api/catalog/search-suggestions/?q=${encodeURIComponent(query)}`,
+    );
+  },
   async getProduct(slug: string) {
-    return request<Product>(`/api/catalog/products/${slug}/`);
+    return request<Product>(`/api/catalog/products/${encodeURIComponent(slug)}/`);
   },
   async getProductById(productId: string) {
     return request<Product>(`/api/catalog/products/id/${encodeURIComponent(productId)}/`);
+  },
+  async getProductRecommendations(slug: string) {
+    return request<ProductRecommendations>(
+      `/api/catalog/products/${encodeURIComponent(slug)}/recommendations/`,
+    );
   },
   async startChat({
     product,
@@ -934,6 +1027,7 @@ const api = {
       form.append("customer_name", payload.customer_name);
       form.append("customer_phone", payload.customer_phone);
       form.append("customer_governorate", payload.customer_governorate);
+      form.append("customer_area", payload.customer_area ?? "");
       form.append("customer_address", payload.customer_address);
       form.append("notes", payload.notes ?? "");
       form.append("shipping_price", String(payload.shipping_price ?? 0));
@@ -942,7 +1036,7 @@ const api = {
 
       const response = await fetch(`${API_BASE_URL}/api/orders/`, {
         method: "POST",
-        headers: getAuthHeaders(),
+        headers: { ...getAuthHeaders(), ...getVisitorHeaders() },
         body: form,
       });
       if (!response.ok) {
@@ -952,10 +1046,11 @@ const api = {
       return safeJson(response) as Promise<Order>;
     }
 
-    return request<Order>("/api/orders/", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+      return request<Order>("/api/orders/", {
+        method: "POST",
+        headers: getVisitorHeaders(),
+        body: JSON.stringify(payload),
+      });
   },
   async trackOrder(orderNumber: string) {
     return request<Order>(
@@ -1184,9 +1279,9 @@ const api = {
 // Track page visits
 const trackVisit = (path: string) => {
   try {
-    fetch('/api/track-visit/', {
+    fetch(`${API_BASE_URL}/api/track-visit/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getVisitorHeaders() },
       body: JSON.stringify({ path, referrer: document.referrer }),
     }).catch(() => {}); // silent fail
   } catch {} // silent fail
@@ -1194,12 +1289,52 @@ const trackVisit = (path: string) => {
 
 const trackFunnelEvent = (eventType: string, productId?: string) => {
   try {
-    fetch('/api/track-funnel-event/', {
+    fetch(`${API_BASE_URL}/api/track-funnel-event/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getVisitorHeaders() },
       body: JSON.stringify({ event_type: eventType, product_id: productId }),
     }).catch(() => {});
   } catch {}
+};
+
+const trackCommerceEvent = (
+  eventName: "add_to_cart" | "begin_checkout" | "purchase",
+  payload: { product?: Product; quantity?: number; value?: number; orderId?: string } = {},
+) => {
+  const value = Number(payload.value ?? payload.product?.final_price ?? 0);
+  const item = payload.product
+    ? {
+        item_id: payload.product.id,
+        item_name: payload.product.title,
+        price: Number(payload.product.final_price),
+        quantity: payload.quantity ?? 1,
+      }
+    : undefined;
+
+  if (typeof window.gtag === "function") {
+    window.gtag("event", eventName, {
+      currency: "EGP",
+      value,
+      transaction_id: payload.orderId,
+      items: item ? [item] : undefined,
+    });
+  }
+
+  if (typeof window.fbq === "function") {
+    const metaEvent =
+      eventName === "add_to_cart"
+        ? "AddToCart"
+        : eventName === "begin_checkout"
+          ? "InitiateCheckout"
+          : "Purchase";
+    window.fbq("track", metaEvent, {
+      content_ids: payload.product ? [payload.product.id] : undefined,
+      content_name: payload.product?.title,
+      content_type: "product",
+      currency: "EGP",
+      value,
+    });
+  }
 };
 
 const vapidKeyToUint8Array = (value: string) => {
@@ -1226,14 +1361,27 @@ function App() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [materialFilter, setMaterialFilter] = useState("");
+  const [colorFilter, setColorFilter] = useState("");
+  const [dimensionFilter, setDimensionFilter] = useState("");
   const [depositFilter, setDepositFilter] = useState("");
   const [shippingFilter, setShippingFilter] = useState("");
   const [minPriceFilter, setMinPriceFilter] = useState("");
   const [maxPriceFilter, setMaxPriceFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [searchInputOpen, setSearchInputOpen] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<CatalogSearchSuggestions>({
+    products: [],
+    categories: [],
+  });
+  const [searchSuggestionsLoading, setSearchSuggestionsLoading] = useState(false);
+  const [filterOptions, setFilterOptions] = useState<CatalogFilterOptions>({
+    colors: [],
+    materials: [],
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1265,7 +1413,9 @@ function App() {
   const [pendingOrderPayload, setPendingOrderPayload] = useState<OrderPayload | null>(null);
   const [sizeModalOpen, setSizeModalOpen] = useState(false);
   const [pendingVariant, setPendingVariant] = useState<ProductVariant | null>(null);
+  const [pendingColor, setPendingColor] = useState<string | null>(null);
   const [detailSelectedVariant, setDetailSelectedVariant] = useState<ProductVariant | null>(null);
+  const [detailSelectedColor, setDetailSelectedColor] = useState<string | null>(null);
   const [detailInfoOpen, setDetailInfoOpen] = useState(false);
   const [shippingInfoOpen, setShippingInfoOpen] = useState(false);
   const [detailThumbnailStart, setDetailThumbnailStart] = useState(0);
@@ -1428,6 +1578,57 @@ function App() {
     }
   }, [hash]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getFilterOptions()
+      .then((options) => {
+        if (!cancelled) setFilterOptions(options);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!searchInputOpen || query.length < 2) {
+      setSearchSuggestions({ products: [], categories: [] });
+      setSearchSuggestionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchSuggestionsLoading(true);
+    const timeout = window.setTimeout(() => {
+      void api
+        .getSearchSuggestions(query)
+        .then((suggestions) => {
+          if (!cancelled) setSearchSuggestions(suggestions);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchSuggestions({ products: [], categories: [] });
+        })
+        .finally(() => {
+          if (!cancelled) setSearchSuggestionsLoading(false);
+        });
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [searchInputOpen, searchQuery]);
+
   // Close the mobile nav dropdown whenever the route changes
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -1439,24 +1640,14 @@ function App() {
   }, [
     selectedCategory,
     materialFilter,
+    colorFilter,
+    dimensionFilter,
     depositFilter,
     shippingFilter,
     minPriceFilter,
     maxPriceFilter,
-    searchQuery,
+    debouncedSearchQuery,
   ]);
-
-  // Debounce search query - only when on catalog page and search query changes
-  useEffect(() => {
-    if (hash !== "#catalog" || !searchQuery.trim()) return;
-
-    const handler = setTimeout(() => {
-      loadProducts();
-    }, 2000);
-
-    return () => clearTimeout(handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, hash]);
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -1469,6 +1660,8 @@ function App() {
       });
       if (selectedCategory) params.set("category", selectedCategory);
       if (materialFilter.trim()) params.set("material", materialFilter.trim());
+      if (colorFilter) params.set("color", colorFilter);
+      if (dimensionFilter.trim()) params.set("dimensions", dimensionFilter.trim());
       if (depositFilter) params.set("has_deposit", depositFilter);
       if (shippingFilter)
         params.set(
@@ -1477,7 +1670,7 @@ function App() {
         );
       if (minPriceFilter.trim()) params.set("min_price", minPriceFilter.trim());
       if (maxPriceFilter.trim()) params.set("max_price", maxPriceFilter.trim());
-      if (searchQuery.trim()) params.set("search", searchQuery.trim());
+      if (debouncedSearchQuery) params.set("search", debouncedSearchQuery);
 
       const categoryRequest = categoriesRef.current.length
         ? Promise.resolve(categoriesRef.current)
@@ -1521,16 +1714,46 @@ function App() {
     }
   }, [
     depositFilter,
+    colorFilter,
+    dimensionFilter,
     materialFilter,
     maxPriceFilter,
     minPriceFilter,
     selectedCategory,
     shippingFilter,
-    searchQuery,
+    debouncedSearchQuery,
     currentPage,
     routeProductSlug,
     routeProductShareCode,
   ]);
+
+  const hasActiveCatalogFilters = Boolean(
+    selectedCategory ||
+      materialFilter ||
+      colorFilter ||
+      dimensionFilter ||
+      depositFilter ||
+      shippingFilter ||
+      minPriceFilter ||
+      maxPriceFilter ||
+      debouncedSearchQuery,
+  );
+
+  const resetCatalogFilters = useCallback(() => {
+    setSelectedCategory("");
+    setMaterialFilter("");
+    setColorFilter("");
+    setDimensionFilter("");
+    setDepositFilter("");
+    setShippingFilter("");
+    setMinPriceFilter("");
+    setMaxPriceFilter("");
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+    setSearchInputOpen(false);
+    setCurrentPage(1);
+    navigate("/products");
+  }, [navigate]);
 
   const loadCustomerProfile = useCallback(async () => {
     if (!localStorage.getItem("furniture_access_token")) {
@@ -1930,8 +2153,10 @@ const mainTab = useMemo<
         if (cancelled) return;
         setActiveProduct(product);
         setActiveImageIndex(0);
+        setImageZoomOpen(false);
         setDetailThumbnailStart(0);
         setDetailSelectedVariant(pickDefaultVariant(product));
+        setDetailSelectedColor(productColorOptions(product)[0] ?? null);
         setDetailInfoOpen(false);
         setShippingInfoOpen(false);
         trackFunnelEvent("product_view", product.id);
@@ -2024,6 +2249,7 @@ const mainTab = useMemo<
   }, [chatContext, conversationId, getChatIdentityToken, recordNavigation]);
 
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [cartRecommendations, setCartRecommendations] = useState<Product[]>([]);
 
   useEffect(() => {
     if (!activeProduct) {
@@ -2040,34 +2266,49 @@ const mainTab = useMemo<
             (item) =>
               item.id !== activeProduct.id &&
               item.category_name === activeProduct.category_name,
-          )
+          );
+
+      const categoryFallback = async () => {
+        const fromCatalog = localFallback();
+        if (fromCatalog.length > 0) return fromCatalog;
+
+        const categorySlug =
+          activeProduct.category_slug ??
+          (await api
+            .listCategories()
+            .then((items) =>
+              items.find((item) => item.name === activeProduct.category_name),
+            )
+            .then((category) => category?.slug)
+            .catch(() => undefined));
+        if (!categorySlug) return fromCatalog;
+
+        const payload = await api.listProducts(
+          new URLSearchParams({
+            category: categorySlug,
+            page_size: "10",
+          }),
+        );
+        const productsFromCategory = Array.isArray(payload)
+          ? payload
+          : payload.results ?? [];
+        return productsFromCategory.filter(
+          (item) => item.id !== activeProduct.id,
+        );
+      };
 
       try {
-        const categorySlug = categories.find(
-          (category) => category.name === activeProduct.category_name,
-        )?.slug;
+        const recommendations = await api.getProductRecommendations(activeProduct.slug);
+        const similar = recommendations.similar.filter(
+          (item) => item.id !== activeProduct.id,
+        );
 
-        const params = new URLSearchParams({ page: "1" });
-        if (categorySlug) {
-          params.set("category", categorySlug);
-        } else {
-          params.set("search", activeProduct.category_name);
-        }
-
-        const payload = await api.listProducts(params);
-        const list = Array.isArray(payload) ? payload : payload.results;
-        const filtered = list
-          .filter(
-            (item) =>
-              item.id !== activeProduct.id &&
-              item.category_name === activeProduct.category_name,
-          )
-
-        if (!cancelled) {
-          setRelatedProducts(filtered.length > 0 ? filtered : localFallback());
-        }
+        const related =
+          similar.length > 0 ? similar : await categoryFallback();
+        if (!cancelled) setRelatedProducts(related);
       } catch {
-        if (!cancelled) setRelatedProducts(localFallback());
+        const fallback = await categoryFallback().catch(() => localFallback());
+        if (!cancelled) setRelatedProducts(fallback);
       }
     };
 
@@ -2075,8 +2316,35 @@ const mainTab = useMemo<
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProduct, categories]);
+  }, [activeProduct, products]);
+
+  useEffect(() => {
+    const lastCartItem = cart.at(-1);
+    if (!lastCartItem) {
+      setCartRecommendations([]);
+      return;
+    }
+
+    let cancelled = false;
+    void api
+      .getProductRecommendations(lastCartItem.product.slug)
+      .then((recommendations) => {
+        if (cancelled) return;
+        const cartProductIds = new Set(cart.map((item) => item.product.id));
+        setCartRecommendations(
+          recommendations.complementary
+            .filter((product) => !cartProductIds.has(product.id))
+            .slice(0, 3),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCartRecommendations([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cart]);
 
   const subtotal = cart.reduce(
     (total, item) => total + itemUnitPrice(item) * item.quantity,
@@ -2129,8 +2397,10 @@ const openProductDetails = async (product: Product) => {
   setSavedScrollPos(window.scrollY);
   setActiveProduct(product);
   setActiveImageIndex(0);
+  setImageZoomOpen(false);
   setDetailThumbnailStart(0);
-  setDetailSelectedVariant(pickDefaultVariant(product)); 
+  setDetailSelectedVariant(pickDefaultVariant(product));
+  setDetailSelectedColor(productColorOptions(product)[0] ?? null);
   setDetailInfoOpen(false);
   setShippingInfoOpen(false);
   setDetailsError("");
@@ -2143,38 +2413,72 @@ const openProductDetails = async (product: Product) => {
 const closeProductDetails = () => {
   navigate("/products");
   setActiveProduct(null);
-  setDetailSelectedVariant(null); 
+  setImageZoomOpen(false);
+  setDetailSelectedVariant(null);
+  setDetailSelectedColor(null);
   window.setTimeout(() => {
     window.scrollTo({ top: savedScrollPos, behavior: "instant" });
   }, 0);
 };
-  const addToCart = (product: Product) => {
-  if (product.variants && product.variants.length > 0) {
-    setActiveProduct(product);
-    setSizeModalOpen(true);
+  const hydrateProductForPurchase = async (product: Product) => {
+    if (hasProductPurchaseDetails(product)) return product;
+    try {
+      return await api.getProduct(product.slug);
+    } catch (error) {
+      setToast({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "تعذر تجهيز بيانات المنتج للسلة.",
+      });
+      return null;
+    }
+  };
+
+  const addToCart = async (product: Product) => {
+    const purchaseProduct = await hydrateProductForPurchase(product);
+    if (!purchaseProduct) return;
+
+    const colors = productColorOptions(purchaseProduct);
+    if ((purchaseProduct.variants?.length ?? 0) > 0 || colors.length > 0) {
+      setActiveProduct(purchaseProduct);
+      setPendingVariant(pickDefaultVariant(purchaseProduct));
+      setPendingColor(colors[0] ?? null);
+      setSizeModalOpen(true);
+      return;
+    }
+    proceedAddToCart(purchaseProduct, null, null);
+  };
+
+const proceedAddToCart = (
+  product: Product,
+  variant: ProductVariant | null,
+  selectedColor: string | null,
+) => {
+  if (productColorOptions(product).length > 0 && !selectedColor) {
+    setToast({ tone: "error", text: "برجاء اختيار اللون أولاً." });
     return;
   }
-  proceedAddToCart(product, null);
-};
-
-const proceedAddToCart = (product: Product, variant: ProductVariant | null) => {
   const hasShippingOptions = product.shipping_rates && product.shipping_rates.length > 0;
   if (hasShippingOptions) {
     setActiveProduct(product);
     setPendingVariant(variant);
+    setPendingColor(selectedColor);
     setLocationModalOpen(true);
     return;
   }
   const defaultShipping = product.default_shipping_price ? Number(product.default_shipping_price) : 0;
-  addItemToCart(product, variant, null, defaultShipping);
+  addItemToCart(product, variant, selectedColor, null, defaultShipping);
 };
 
-const selectProductSize = (product: Product, variant: ProductVariant) => {
+const selectProductOptions = (product: Product) => {
   setSizeModalOpen(false);
-  proceedAddToCart(product, variant);
+  proceedAddToCart(product, pendingVariant, pendingColor);
 };
 const openCheckout = () => {
   trackFunnelEvent('checkout_start');
+  trackCommerceEvent("begin_checkout", { value: grandTotal });
   navigate("/checkout");
   setCheckoutOpen(true);
 };
@@ -2182,43 +2486,63 @@ const openCheckout = () => {
 const addItemToCart = (
   product: Product,
   variant: ProductVariant | null,
+  selectedColor: string | null,
   location: string | null,
   shippingPrice: number,
 ) => {
     trackFunnelEvent('add_to_cart', product.id);
-  const key = cartItemKey(product, variant);
+  trackCommerceEvent("add_to_cart", { product });
+  const key = cartItemKey(product, variant, selectedColor);
   setCart((current) => {
-    const existing = current.find((item) => cartItemKey(item.product, item.selectedVariant) === key);
+    const existing = current.find(
+      (item) => cartItemKey(item.product, item.selectedVariant, item.selectedColor) === key,
+    );
     if (existing) {
       return current.map((item) =>
-        cartItemKey(item.product, item.selectedVariant) === key
+        cartItemKey(item.product, item.selectedVariant, item.selectedColor) === key
           ? { ...item, quantity: item.quantity + 1 }
           : item,
       );
     }
     return [
       ...current,
-      { product, quantity: 1, selectedVariant: variant, selectedLocation: location, shippingPrice },
+      {
+        product,
+        quantity: 1,
+        selectedVariant: variant,
+        selectedColor,
+        selectedLocation: location,
+        shippingPrice,
+      },
     ];
   });
   setCartOpen(true);
   const sizeLabel = variant ? ` (${variant.size_name})` : "";
-  setToast({ tone: "success", text: `${product.title}${sizeLabel} أضيف للسلة.` });
+  const colorLabel = selectedColor ? ` - ${selectedColor}` : "";
+  setToast({ tone: "success", text: `${product.title}${sizeLabel}${colorLabel} أضيف للسلة.` });
 };
 
   const selectShippingLocation = (product: Product, location: string, price: number) => {
-  addItemToCart(product, pendingVariant, location, price);
+  addItemToCart(product, pendingVariant, pendingColor, location, price);
   setPendingVariant(null);
+  setPendingColor(null);
   setLocationModalOpen(false);
   setCartOpen(true);
 };
 
-  const updateQuantity = (product: Product, variant: ProductVariant | null | undefined, quantity: number) => {
-  const key = cartItemKey(product, variant ?? null);
+  const updateQuantity = (
+    product: Product,
+    variant: ProductVariant | null | undefined,
+    selectedColor: string | null | undefined,
+    quantity: number,
+  ) => {
+  const key = cartItemKey(product, variant ?? null, selectedColor);
   setCart((current) =>
     current
       .map((item) =>
-        cartItemKey(item.product, item.selectedVariant) === key ? { ...item, quantity } : item,
+        cartItemKey(item.product, item.selectedVariant, item.selectedColor) === key
+          ? { ...item, quantity }
+          : item,
       )
       .filter((item) => item.quantity > 0),
   );
@@ -2550,12 +2874,21 @@ const addItemToCart = (
       customer_name: String(form.get("customer_name") ?? ""),
       customer_phone: String(form.get("customer_phone") ?? ""),
       customer_governorate: String(form.get("customer_governorate") ?? ""),
+      customer_area: String(form.get("customer_area") ?? ""),
       customer_address: String(form.get("customer_address") ?? ""),
       notes: String(form.get("notes") ?? ""),
       shipping_price: totalShipping,
-      items: cart.map(({ product, quantity, shippingPrice, selectedLocation, selectedVariant }) => ({
+      items: cart.map(({
+        product,
+        quantity,
+        shippingPrice,
+        selectedLocation,
+        selectedVariant,
+        selectedColor,
+      }) => ({
         product_id: product.id,
         variant_id: selectedVariant ? selectedVariant.id : null,
+        selected_color: selectedColor ?? null,
         quantity,
         shipping_price: shippingPrice,
         shipping_location: selectedLocation,
@@ -2578,7 +2911,10 @@ const addItemToCart = (
 
     try {
       const order = await api.createOrder(pendingOrderPayload, depositProofFile);
-      trackFunnelEvent('order_complete');
+      trackCommerceEvent("purchase", {
+        value: Number(order.total_price ?? grandTotal),
+        orderId: order.order_number ?? order.id,
+      });
       setOrderResult(order);
       setCart([]);
       setCheckoutOpen(false);
@@ -3883,25 +4219,82 @@ const addItemToCart = (
         <div className="nav-actions">
           <div className="search-container">
             {searchInputOpen && (
-              <input
-                type="text"
-                placeholder="ابحث عن منتج..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setSearchInputOpen(false);
-                    navigate("/products");
-                  }
-                }}
-                className="search-input"
-                autoFocus
-              />
+              <>
+                <input
+                  type="text"
+                  placeholder="ابحث عن منتج أو خامة أو مقاس..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setDebouncedSearchQuery(searchQuery.trim());
+                      setSelectedCategory("");
+                      setSearchInputOpen(false);
+                      navigate("/products");
+                    }
+                  }}
+                  className="search-input"
+                  autoFocus
+                />
+                {searchQuery.trim().length >= 2 && (
+                  <div className="search-suggestions" role="listbox">
+                    {searchSuggestionsLoading && (
+                      <span className="search-suggestions-status">جاري البحث...</span>
+                    )}
+                    {!searchSuggestionsLoading && searchSuggestions.categories.map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        className="search-suggestion category"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setDebouncedSearchQuery("");
+                          setSelectedCategory(category.slug);
+                          setSearchInputOpen(false);
+                          navigate(`/category/${encodeURIComponent(category.slug)}`);
+                        }}
+                      >
+                        <span>التصنيف</span>
+                        {category.name}
+                      </button>
+                    ))}
+                    {!searchSuggestionsLoading && searchSuggestions.products.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="search-suggestion"
+                        onClick={() => {
+                          setSearchInputOpen(false);
+                          void openProductDetails(product);
+                        }}
+                      >
+                        {resolveAssetUrl(getImageUrl(product.images)) && (
+                          <img
+                            src={resolveAssetUrl(getImageUrl(product.images))!}
+                            alt=""
+                          />
+                        )}
+                        <span>{product.title}</span>
+                        <strong>{money(product.final_price)}</strong>
+                      </button>
+                    ))}
+                    {!searchSuggestionsLoading &&
+                      searchSuggestions.categories.length === 0 &&
+                      searchSuggestions.products.length === 0 && (
+                        <span className="search-suggestions-status">
+                          لا توجد نتيجة مباشرة، جرّب اسمًا أو خامة مختلفة.
+                        </span>
+                      )}
+                  </div>
+                )}
+              </>
             )}
             <button
               type="button"
               onClick={() => {
                 if (searchInputOpen && searchQuery.trim()) {
+                  setDebouncedSearchQuery(searchQuery.trim());
+                  setSelectedCategory("");
                   setSearchInputOpen(false);
                   navigate("/products");
                 } else {
@@ -4296,12 +4689,38 @@ const addItemToCart = (
               {filtersExpanded ? "إخفاء الفلاتر" : "فلاتر أكتر …"}
             </button>
             <div className={`toolbar-extra-filters${filtersExpanded ? " expanded" : ""}`}>
-              <input
+              <select
                 className="toolbar-material"
                 value={materialFilter}
                 onChange={(event) => setMaterialFilter(event.target.value)}
-                placeholder="فلترة حسب الخامة"
                 aria-label="فلترة حسب الخامة"
+              >
+                <option value="">كل الخامات</option>
+                {filterOptions.materials.map((material) => (
+                  <option value={material} key={material}>
+                    {material}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="toolbar-color"
+                value={colorFilter}
+                onChange={(event) => setColorFilter(event.target.value)}
+                aria-label="فلترة حسب اللون"
+              >
+                <option value="">كل الألوان</option>
+                {filterOptions.colors.map((color) => (
+                  <option value={color} key={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="toolbar-dimensions"
+                value={dimensionFilter}
+                onChange={(event) => setDimensionFilter(event.target.value)}
+                placeholder="ابحث بالمقاس أو البعد"
+                aria-label="فلترة حسب المقاسات"
               />
               <select
                 className="toolbar-deposit"
@@ -4352,10 +4771,17 @@ const addItemToCart = (
         {!loading && !apiError && products.length === 0 && (
           <div className="state-panel">
             <PackageSearch size={30} />
-            <h3>لا توجد منتجات</h3>
+            <h3>{hasActiveCatalogFilters ? "لم نجد نتائج مطابقة" : "لا توجد منتجات"}</h3>
             <p>
-              أضف منتجات من لوحة الإدارة وسيتم عرضها هنا تلقائياً.
+              {hasActiveCatalogFilters
+                ? "جرّب تغيير عبارة البحث أو حذف بعض الفلاتر، أو اعرض كل المنتجات المتاحة."
+                : "أضف منتجات من لوحة الإدارة وسيتم عرضها هنا تلقائياً."}
             </p>
+            {hasActiveCatalogFilters && (
+              <button type="button" onClick={resetCatalogFilters}>
+                عرض كل المنتجات
+              </button>
+            )}
           </div>
         )}
 
@@ -4372,7 +4798,7 @@ const addItemToCart = (
                     aria-label={`Open details for ${product.title}`}
                   >
                     {image ? (
-                      <img src={image} alt={product.title} />
+                      <img src={image} alt={product.title} loading="lazy" decoding="async" />
                     ) : (
                       <span className="image-placeholder">No Image</span>
                     )}
@@ -4613,6 +5039,10 @@ const addItemToCart = (
                     getImageUrl(productImages[0]),
                 )
               : resolveAssetUrl(getImageUrl(activeProduct.images));
+          const displayMainImageUrl = mainImageUrl
+            ? optimizeProductImageUrl(mainImageUrl, 1500)
+            : null;
+          const measurementImageUrl = resolveAssetUrl(activeProduct.measurement_image);
           const imageEntries = productImages
             .map((img: unknown, idx: number) => ({
               idx,
@@ -4632,12 +5062,22 @@ const addItemToCart = (
             <section id="details" className="detail-section">
               <div className="detail-gallery">
                 <div className="detail-gallery-main">
-                  {mainImageUrl ? (
-                    <img
-                      src={mainImageUrl}
-                      alt={activeProduct.title}
-                      className="main-detail-image"
-                    />
+                  {displayMainImageUrl ? (
+                    <button
+                      type="button"
+                      className="detail-image-zoom-trigger"
+                      onClick={() => setImageZoomOpen(true)}
+                      aria-label={`تكبير صورة ${activeProduct.title}`}
+                    >
+                      <img
+                        src={displayMainImageUrl}
+                        alt={activeProduct.title}
+                        className="main-detail-image"
+                      />
+                      <span className="detail-image-zoom-icon" aria-hidden="true">
+                        <ZoomIn size={18} />
+                      </span>
+                    </button>
                   ) : (
                     <div className="detail-placeholder">
                       لا توجد صورة للمنتج
@@ -4672,7 +5112,7 @@ const addItemToCart = (
                           aria-label={`View image ${idx + 1}`}
                         >
                           <img
-                            src={url}
+                            src={optimizeProductImageUrl(url, 180)}
                             alt={`${activeProduct.title} thumbnail ${idx + 1}`}
                           />
                         </button>
@@ -4717,28 +5157,41 @@ const addItemToCart = (
                     <ChevronDown size={17} />
                   </button>
                   {detailInfoOpen && (
-                    <dl className="spec-list">
-                      <div>
-                        <dt>الخامة</dt>
-                        <dd>{activeProduct.material ?? "-"}</dd>
-                      </div>
-                      <div>
-                        <dt>اللون</dt>
-                        <dd>{activeProduct.color ?? "-"}</dd>
-                      </div>
-                      <div>
-                        <dt>الأبعاد</dt>
-                        <dd>{activeProduct.dimensions ?? "-"}</dd>
-                      </div>
-                      <div>
-                        <dt>العربون</dt>
-                        <dd>
-                          {activeProduct.requires_deposit
-                            ? money(activeProduct.deposit_amount)
-                            : "غير مطلوب"}
-                        </dd>
-                      </div>
-                    </dl>
+                    <>
+                      <dl className="spec-list">
+                        <div>
+                          <dt>الخامة</dt>
+                          <dd>{activeProduct.material ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>اللون</dt>
+                          <dd>{activeProduct.color ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>الأبعاد</dt>
+                          <dd>{activeProduct.dimensions ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>العربون</dt>
+                          <dd>
+                            {activeProduct.requires_deposit
+                              ? money(activeProduct.deposit_amount)
+                              : "غير مطلوب"}
+                          </dd>
+                        </div>
+                      </dl>
+                      {measurementImageUrl && (
+                        <a
+                          className="measurement-image-link"
+                          href={measurementImageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <img src={measurementImageUrl} alt={`مخطط مقاسات ${activeProduct.title}`} />
+                          <span>عرض مخطط المقاسات</span>
+                        </a>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -4756,6 +5209,12 @@ const addItemToCart = (
                     {shippingInfoOpen && (
                       <div className="shipping-info">
                         <p className="shipping-message">{activeProduct.shipping_summary.message}</p>
+                        {activeProduct.shipping_summary.estimated_delivery && (
+                          <p className="shipping-estimate">
+                            <span>التوصيل المتوقع</span>
+                            <strong>{activeProduct.shipping_summary.estimated_delivery}</strong>
+                          </p>
+                        )}
                         {activeProduct.shipping_rates && activeProduct.shipping_rates.length > 0 && (
                           <div className="shipping-rates-list">
                             {activeProduct.shipping_rates.map((rate, idx) => (
@@ -4783,6 +5242,24 @@ const addItemToCart = (
                           aria-pressed={detailSelectedVariant?.id === variant.id}
                         >
                           {variant.size_name?.trim() || `المقاس ${variantIndex + 1}`} — {money(variant.price)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {productColorOptions(activeProduct).length > 0 && (
+                  <div className="color-selector">
+                    <h4>الألوان المتاحة</h4>
+                    <div className="color-options">
+                      {productColorOptions(activeProduct).map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`color-option-btn ${detailSelectedColor === color ? "active" : ""}`}
+                          onClick={() => setDetailSelectedColor(color)}
+                          aria-pressed={detailSelectedColor === color}
+                        >
+                          {color}
                         </button>
                       ))}
                     </div>
@@ -4819,14 +5296,25 @@ const addItemToCart = (
                       type="button"
                       className="detail-cart-btn"
                       disabled={Boolean(activeProduct.variants?.length) && !detailSelectedVariant}
-                      onClick={() => proceedAddToCart(activeProduct, detailSelectedVariant)}
+                      onClick={() =>
+                        proceedAddToCart(
+                          activeProduct,
+                          detailSelectedVariant,
+                          detailSelectedColor,
+                        )
+                      }
                     >
                       أضف للسلة
                     </button>
                     <button
                       type="button"
                       className="detail-whatsapp-btn"
-                      onClick={() => openProductWhatsapp(activeProduct)}
+                      onClick={() =>
+                        openProductWhatsapp(activeProduct, {
+                          variant: detailSelectedVariant,
+                          color: detailSelectedColor,
+                        })
+                      }
                     >
                       <img
                         src="https://cdn.simpleicons.org/whatsapp/25D366"
@@ -4840,6 +5328,30 @@ const addItemToCart = (
                 </div>
               </div>
             </section>
+
+            {imageZoomOpen && displayMainImageUrl && (
+              <div
+                className="image-zoom-overlay"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`صورة مكبرة لـ ${activeProduct.title}`}
+                onClick={() => setImageZoomOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="image-zoom-close"
+                  onClick={() => setImageZoomOpen(false)}
+                  aria-label="إغلاق الصورة المكبرة"
+                >
+                  <X size={22} />
+                </button>
+                <img
+                  src={displayMainImageUrl}
+                  alt={activeProduct.title}
+                  onClick={(event) => event.stopPropagation()}
+                />
+              </div>
+            )}
 
             {relatedProducts.length > 0 && (
               <section className="related-section">
@@ -4879,7 +5391,7 @@ const addItemToCart = (
                           aria-label={`Open details for ${related.title}`}
                         >
                           {relatedImage ? (
-                            <img src={relatedImage} alt={related.title} />
+                            <img src={relatedImage} alt={related.title} loading="lazy" decoding="async" />
                           ) : (
                             <span className="image-placeholder">
                               No Image
@@ -4939,12 +5451,13 @@ const addItemToCart = (
             <h3>سلتك</h3>
             <div className="checkout-cart-list">
               {cart.map((item) => (
-                <div className="checkout-cart-item" key={cartItemKey(item.product, item.selectedVariant)}>
+                <div className="checkout-cart-item" key={cartItemKey(item.product, item.selectedVariant, item.selectedColor)}>
                   <div className="checkout-item-details">
                     <div className="checkout-item-header">
                       <strong>
                         {item.product.title}
                         {item.selectedVariant && <span className="variant-badge">{item.selectedVariant.size_name}</span>}
+                        {item.selectedColor && <span className="variant-badge">{item.selectedColor}</span>}
                       </strong>
                       <span className="price">{money(itemUnitPrice(item))}</span>
                     </div>
@@ -4965,7 +5478,7 @@ const addItemToCart = (
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product, item.selectedVariant, Math.max(0, item.quantity - 1))}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.selectedColor, Math.max(0, item.quantity - 1))}
                         aria-label="Decrease quantity"
                       >
                         -
@@ -4974,7 +5487,7 @@ const addItemToCart = (
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.selectedColor, item.quantity + 1)}
                         aria-label="Increase quantity"
                       >
                         +
@@ -5148,10 +5661,11 @@ const addItemToCart = (
             <>
               <div className="cart-list">
                 {cart.map((item) => (
-                  <div className="cart-row" key={cartItemKey(item.product, item.selectedVariant)}>
+                  <div className="cart-row" key={cartItemKey(item.product, item.selectedVariant, item.selectedColor)}>
                     <div>
                     <strong>{item.product.title}</strong>
                     {item.selectedVariant && <small className="variant-badge">{item.selectedVariant.size_name}</small>}
+                    {item.selectedColor && <small className="variant-badge">{item.selectedColor}</small>}
                     <span>{money(itemUnitPrice(item))}</span>
                     {item.selectedLocation && (
                       <small className="shipping-info">
@@ -5163,7 +5677,7 @@ const addItemToCart = (
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product, item.selectedVariant, Math.max(0, item.quantity - 1))}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.selectedColor, Math.max(0, item.quantity - 1))}
                         aria-label="Decrease quantity"
                       >
                         -
@@ -5172,7 +5686,7 @@ const addItemToCart = (
                       <button
                         type="button"
                         className="quantity-btn"
-                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product, item.selectedVariant, item.selectedColor, item.quantity + 1)}
                         aria-label="Increase quantity"
                       >
                         +
@@ -5181,6 +5695,25 @@ const addItemToCart = (
                   </div>
                 ))}
               </div>
+              {cartRecommendations.length > 0 && (
+                <section className="cart-recommendations" aria-label="منتجات تكمل طلبك">
+                  <p>قد تناسب طلبك</p>
+                  <div>
+                    {cartRecommendations.map((product) => {
+                      const image = resolveAssetUrl(getImageUrl(product.images));
+                      return (
+                        <article key={product.id}>
+                          {image && <img src={image} alt="" loading="lazy" />}
+                          <span>{product.title}</span>
+                          <button type="button" onClick={() => void addToCart(product)}>
+                            أضف
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
               <div className="cart-total">
                 <span>المجموع الفرعي</span>
                 <strong>{money(subtotal)}</strong>
@@ -5210,9 +5743,13 @@ const addItemToCart = (
                   type="button"
                   className="whatsapp-checkout-btn"
                   onClick={() => {
-                    const orderMessage = cart.map(item =>
-                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(item.product.final_price * item.quantity)}\nرابط المنتج: ${productShareUrl(item.product)}`
-                    ).join('\n');
+                    trackFunnelEvent("checkout_start");
+                    const orderMessage = cart.map((item) => [
+                      `• ${item.product.title} - الكمية: ${item.quantity} - ${money(itemUnitPrice(item) * item.quantity)}`,
+                      item.selectedVariant ? `المقاس: ${item.selectedVariant.size_name}` : "",
+                      item.selectedColor ? `اللون: ${item.selectedColor}` : "",
+                      `رابط المنتج: ${productShareUrl(item.product)}`,
+                    ].filter(Boolean).join("\n")).join("\n\n");
                     const message = `مرحباً، أريد إنشاء طلب جديد:\n\n${orderMessage}\n\nالمجموع: ${money(subtotal)}\nالشحن: ${money(totalShipping)}\nالإجمالي: ${money(grandTotal)}`;
                     const whatsappUrl = `https://wa.me/201503466584?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
@@ -5237,7 +5774,7 @@ const addItemToCart = (
         <aside className="modal-panel" aria-label="Checkout">
           <form className="checkout-form" onSubmit={submitOrder}>
             <header>
-              <h2>الدفع</h2>
+              <h2>إتمام الطلب</h2>
               <button
                 type="button"
                 onClick={() => setCheckoutOpen(false)}
@@ -5246,6 +5783,11 @@ const addItemToCart = (
                 <X size={20} />
               </button>
             </header>
+            <div className="checkout-progress" aria-label="خطوات إتمام الطلب">
+              <span className="active">١. العنوان</span>
+              <span>٢. مراجعة الطلب</span>
+              <span>٣. تأكيد الفريق</span>
+            </div>
             <input name="customer_name" placeholder="الاسم ثنائى" required />
             <input name="customer_phone" placeholder="رقم الهاتف" required />
             <input
@@ -5253,12 +5795,16 @@ const addItemToCart = (
               placeholder="المحافظة"
               required
             />
+            <input name="customer_area" placeholder="المنطقة أو الحي" />
             <textarea
               name="customer_address"
               placeholder="العنوان بالتفصيل "
               required
             />
             <textarea name="notes" placeholder="اللون والمقاس المطلوب اذا كان المنتج له اكثر من مقاس" />
+            <p className="checkout-trust-copy">
+              بياناتك تُستخدم لتأكيد الطلب والتوصيل فقط، وسيتم التواصل معك قبل التنفيذ.
+            </p>
             <div className="checkout-summary">
               <div className="summary-row">
                 <span>المجموع الفرعي</span>
@@ -5403,29 +5949,59 @@ const addItemToCart = (
   <aside className="modal-panel" aria-label="Select product size">
     <div className="location-modal">
       <header>
-        <h2>اختيار المقاس</h2>
+        <h2>اختيار الخيارات</h2>
         <button type="button" onClick={() => setSizeModalOpen(false)} aria-label="Close size modal">
           <X size={20} />
         </button>
       </header>
       <p className="location-product-name">{activeProduct.title}</p>
-      {activeProduct.variants && activeProduct.variants.length > 0 ? (
-        <div className="location-options">
+      {activeProduct.variants && activeProduct.variants.length > 0 && (
+        <section className="product-option-group">
+          <h3>المقاس</h3>
+          <div className="location-options">
           {activeProduct.variants.map((variant) => (
             <button
               key={variant.id}
               type="button"
-              className="location-option"
-              onClick={() => selectProductSize(activeProduct, variant)}
+              className={`location-option ${pendingVariant?.id === variant.id ? "selected" : ""}`}
+              onClick={() => setPendingVariant(variant)}
             >
               <span>{variant.size_name}</span>
               <span className="location-price">{money(variant.price)}</span>
             </button>
           ))}
-        </div>
-      ) : (
-        <p className="muted">لا توجد مقاسات متاحة لهذا المنتج.</p>
+          </div>
+        </section>
       )}
+      {productColorOptions(activeProduct).length > 0 && (
+        <section className="product-option-group">
+          <h3>اللون</h3>
+          <div className="color-options">
+            {productColorOptions(activeProduct).map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`color-option-btn ${pendingColor === color ? "active" : ""}`}
+                onClick={() => setPendingColor(color)}
+                aria-pressed={pendingColor === color}
+              >
+                {color}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <button
+        type="button"
+        className="panel-primary product-options-confirm"
+        disabled={
+          Boolean(activeProduct.variants?.length) && !pendingVariant ||
+          productColorOptions(activeProduct).length > 0 && !pendingColor
+        }
+        onClick={() => selectProductOptions(activeProduct)}
+      >
+        متابعة لاختيار الشحن
+      </button>
     </div>
   </aside>
 )}

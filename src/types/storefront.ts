@@ -13,10 +13,13 @@ export type Product = {
   description?: string | null;
   material?: string | null;
   color?: string | null;
+  color_options?: string[];
   dimensions?: string | null;
+  measurement_image?: string | null;
   final_price: string;
   is_available?: boolean;
   category_name: string;
+  category_slug?: string;
   requires_deposit?: boolean;
   deposit_amount?: string | null;
   deposit_note?: string | null;
@@ -38,6 +41,7 @@ export type Product = {
     has_free_shipping: boolean;
     default_price: string | null;
     message: string;
+    estimated_delivery?: string;
   };
 };
 
@@ -47,4 +51,5 @@ export type CartItem = {
   selectedLocation?: string | null;
   shippingPrice?: number;
   selectedVariant?: ProductVariant | null;
+  selectedColor?: string | null;
 };

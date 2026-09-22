@@ -16,6 +16,8 @@ const xmlEscape = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
+const encodedPath = (segment) => encodeURIComponent(String(segment));
+
 async function fetchProducts() {
   const products = [];
   let nextUrl = `${API_BASE_URL}/api/catalog/products/`;
@@ -95,7 +97,7 @@ async function generateSitemap() {
   for (const category of categories) {
     if (category.slug) {
       sitemapContent += `  <url>
-    <loc>${SITE_URL}/category/${xmlEscape(category.slug)}</loc>
+    <loc>${SITE_URL}/category/${xmlEscape(encodedPath(category.slug))}</loc>
     <priority>0.7</priority>
     <changefreq>weekly</changefreq>
   </url>\n`;
@@ -106,7 +108,7 @@ async function generateSitemap() {
   for (const product of products) {
     if (product.slug) {
       sitemapContent += `  <url>
-    <loc>${SITE_URL}/product/${xmlEscape(product.slug)}</loc>
+    <loc>${SITE_URL}/product/${xmlEscape(encodedPath(product.slug))}</loc>
     <priority>0.8</priority>
     <changefreq>weekly</changefreq>
   </url>\n`;

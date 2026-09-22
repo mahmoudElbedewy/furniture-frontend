@@ -24,10 +24,11 @@ const readCart = (identityToken: string | null): CartItem[] => {
   }
 };
 
-const cartItemKey = (item: CartItem) =>
-  item.selectedVariant
-    ? `${item.product.id}::${item.selectedVariant.id}`
-    : item.product.id;
+const cartItemKey = (item: CartItem) => {
+  const variantKey = item.selectedVariant?.id ?? "default";
+  const colorKey = item.selectedColor?.trim() || "default";
+  return `${item.product.id}::${variantKey}::${colorKey}`;
+};
 
 const mergeCarts = (savedCart: CartItem[], pendingCart: CartItem[]) => {
   const merged = new Map(savedCart.map((item) => [cartItemKey(item), item]));

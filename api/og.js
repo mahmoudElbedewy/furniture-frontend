@@ -60,6 +60,42 @@ const productImage = (product) => {
   return DEFAULT_IMAGE;
 };
 
+const productOffersSchema = (product, canonical) => {
+  const prices = [
+    product?.final_price,
+    ...(Array.isArray(product?.variants)
+      ? product.variants.map((variant) => variant?.price)
+      : []),
+  ]
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  const uniquePrices = [...new Set(prices)];
+  const availability =
+    product?.is_available === false
+      ? "https://schema.org/OutOfStock"
+      : "https://schema.org/InStock";
+
+  if (uniquePrices.length > 1) {
+    return {
+      "@type": "AggregateOffer",
+      priceCurrency: "EGP",
+      lowPrice: Math.min(...uniquePrices),
+      highPrice: Math.max(...uniquePrices),
+      offerCount: uniquePrices.length,
+      availability,
+      url: canonical,
+    };
+  }
+
+  return {
+    "@type": "Offer",
+    priceCurrency: "EGP",
+    price: uniquePrices[0],
+    availability,
+    url: canonical,
+  };
+};
+
 const renderMetadata = ({
   title,
   description,
@@ -116,6 +152,7 @@ const renderStorefrontPage = (spaHtml, page) => {
   const withoutStaticMetadata = spaHtml
     .replace(/<title\b[^>]*>[\s\S]*?<\/title>\s*/i, "")
     .replace(/<meta\b[^>]*\bname=["']description["'][^>]*>\s*/gi, "")
+    .replace(/<meta\b[^>]*\bname=["']robots["'][^>]*>\s*/gi, "")
     .replace(/<link\b[^>]*\brel=["']canonical["'][^>]*>\s*/gi, "")
     .replace(
       /<meta\b[^>]*(?:\bproperty=["']og:[^"']+["']|\bname=["']twitter:[^"']+["'])[^>]*>\s*/gi,
@@ -164,7 +201,6 @@ export default async function handler(req, res) {
       const product = await productResponse.json();
       const canonical = `${SITE_ORIGIN}/product/${encodeURIComponent(product.slug || slug)}`;
       const image = productImage(product);
-      const price = Number(product.final_price);
       page = {
         title: `${product.title} | Home Style`,
         description: truncate(
@@ -181,16 +217,8 @@ export default async function handler(req, res) {
           image: [image],
           sku: String(product.id),
           category: product.category_name || undefined,
-          offers: {
-            "@type": "Offer",
-            priceCurrency: "EGP",
-            price: Number.isFinite(price) ? price : undefined,
-            availability:
-              product.is_available === false
-                ? "https://schema.org/OutOfStock"
-                : "https://schema.org/InStock",
-            url: canonical,
-          },
+          brand: { "@type": "Brand", name: "Home Style" },
+          offers: productOffersSchema(product, canonical),
         },
       };
     } else if (type === "category" && slug) {
